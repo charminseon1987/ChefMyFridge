@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, ChevronRight, ChevronLeft, Check, 
@@ -395,117 +396,276 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
     </div>
   )
 
-  // --- Step 4: Report View ---
-  const renderReportStep = () => (
-      <div className="flex flex-col h-full">
-         <div className="flex justify-between items-center mb-4 border-b pb-2">
-             <h2 className="text-xl font-bold text-black flex items-center">
-                <FileText className="w-5 h-5 mr-2 text-violet-600" />
-                {selectedRecipe?.title} 쿠킹 리포트
-             </h2>
-             <button onClick={() => setStep(3)} className="text-sm text-slate-500 hover:text-slate-800">
-                다른 레시피 선택
-             </button>
-         </div>
+  // --- Step 4: Report View (Infographic) ---
+  const renderReportStep = () => {
+      // Helper to safely parse report content
+      let content: any = report
+      if (typeof report === 'string') {
+          try {
+              content = JSON.parse(report)
+          } catch (e) {
+              // Backward compatibility for plain markdown
+              return (
+                <div className="flex flex-col h-full">
+                    <div className="flex justify-between items-center mb-4 border-b pb-2">
+                         <h2 className="text-xl font-bold text-black flex items-center">
+                            <FileText className="w-5 h-5 mr-2 text-violet-600" />
+                            {selectedRecipe?.title} 쿠킹 리포트
+                         </h2>
+                         <button onClick={() => setStep(3)} className="text-sm text-slate-500 hover:text-slate-800">
+                            다른 레시피 선택
+                         </button>
+                     </div>
+                     <div className="flex-1 overflow-y-auto bg-slate-50 p-6 rounded-lg border prose prose-slate max-w-none">
+                        <ReactMarkdown>{report}</ReactMarkdown>
+                     </div>
+                     <div className="mt-4 flex justify-end">
+                        <button onClick={onClose} className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-lg">닫기</button>
+                     </div>
+                </div>
+              )
+          }
+      }
+      
+      const { title, intro, stats, ingredients, steps, chef_kick, pairing } = content || {}
 
-         <div className="flex-1 overflow-y-auto bg-slate-50 p-6 rounded-lg border">
-             {isGeneratingReport ? (
-                 <div className="flex flex-col items-center justify-center h-64">
-                     <Loader2 className="w-12 h-12 text-violet-500 animate-spin mb-4" />
-                     <p className="text-lg font-medium text-slate-700 animate-pulse">
-                         전문가 스타일의 블로그 포스팅 작성 중...
-                     </p>
-                     <p className="text-sm text-slate-500 mt-2">
-                         (꿀팁, 플레이팅 가이드 포함)
+      return (
+          <div className="flex flex-col h-full bg-slate-50/50">
+             {/* Header Section */}
+             <div className="flex justify-between items-start mb-6 border-b border-slate-200 pb-4 pt-2">
+                 <div>
+                     <h2 className="text-3xl font-extrabold text-slate-900 mb-2 tracking-tight">
+                        {title || selectedRecipe?.title}
+                     </h2>
+                     <p className="text-slate-600 font-medium italic text-lg leading-relaxed">
+                        "{intro || '오늘의 셰프 추천 요리입니다.'}"
                      </p>
                  </div>
-             ) : (
-                 <div className="prose prose-slate max-w-none">
-                     <ReactMarkdown>{report || ''}</ReactMarkdown>
-                 </div>
-             )}
-         </div>
-         
-         <div className="mt-4 flex justify-end">
-            <button 
-                onClick={onClose}
-                className="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-lg"
-            >
-                닫기
-            </button>
-         </div>
-      </div>
-  )
+                 <button onClick={() => setStep(3)} className="text-sm text-slate-400 hover:text-slate-600 underline decoration-1 underline-offset-4">
+                    다른 레시피
+                 </button>
+             </div>
+
+             <div className="flex-1 overflow-y-auto pr-2 pb-10">
+                 {isGeneratingReport ? (
+                     <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+                         <Loader2 className="w-16 h-16 text-emerald-500 animate-spin mb-6" />
+                         <p className="text-2xl font-bold text-slate-800 animate-pulse mb-2">
+                             셰프가 레시피를 분석 중입니다...
+                         </p>
+                         <p className="text-slate-500 font-medium text-lg">
+                             (영양 정보, 꿀팁, 페어링 추천 생성 중)
+                         </p>
+                     </div>
+                 ) : (
+                     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                         {/* Stats Row */}
+                         {stats && (
+                             <div className="flex flex-wrap gap-4 text-sm font-bold text-slate-700">
+                                 <div className="flex items-center bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-200">
+                                     <span className="bg-orange-100 p-2 rounded-full mr-3 text-orange-600"><RefreshCw className="w-5 h-5"/></span>
+                                     <div>
+                                         <span className="block text-xs text-slate-400 uppercase tracking-wider">조리 시간</span>
+                                         {stats.time}
+                                     </div>
+                                 </div>
+                                 <div className="flex items-center bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-200">
+                                     <span className="bg-red-100 p-2 rounded-full mr-3 text-red-600"><ShoppingBag className="w-5 h-5"/></span>
+                                      <div>
+                                         <span className="block text-xs text-slate-400 uppercase tracking-wider">칼로리</span>
+                                         {stats.calories}
+                                     </div>
+                                 </div>
+                                 <div className="flex items-center bg-white px-4 py-3 rounded-xl shadow-sm border border-slate-200">
+                                     <span className="bg-blue-100 p-2 rounded-full mr-3 text-blue-600"><ChefHat className="w-5 h-5"/></span>
+                                      <div>
+                                         <span className="block text-xs text-slate-400 uppercase tracking-wider">난이도</span>
+                                         {stats.difficulty}
+                                     </div>
+                                 </div>
+                             </div>
+                         )}
+
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             {/* Ingredients Card */}
+                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-full">
+                                 <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center border-b pb-4">
+                                     <span className="bg-emerald-100 text-emerald-700 w-8 h-8 rounded-lg flex items-center justify-center mr-3 text-sm">재료</span>
+                                     준비물 체크리스트
+                                 </h3>
+                                 <ul className="space-y-3">
+                                     {ingredients?.map((ing: any, i: number) => (
+                                         <li key={i} className="flex items-start">
+                                             <div className="mt-1 mr-3 min-w-5 h-5 rounded border border-emerald-300 bg-emerald-50 flex items-center justify-center">
+                                                 <Check className="w-3 h-3 text-emerald-600" />
+                                             </div>
+                                             <div>
+                                                 <span className="font-bold text-slate-800">{ing.name}</span>
+                                                 {ing.amount && <span className="text-slate-500 ml-2 text-sm bg-slate-100 px-2 py-0.5 rounded-full">{ing.amount}</span>}
+                                                 {ing.note && <p className="text-xs text-slate-400 mt-1">{ing.note}</p>}
+                                             </div>
+                                         </li>
+                                     ))}
+                                 </ul>
+                             </div>
+
+                             {/* Steps Card */}
+                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-full">
+                                 <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center border-b pb-4">
+                                     <span className="bg-blue-100 text-blue-700 w-8 h-8 rounded-lg flex items-center justify-center mr-3 text-sm">순서</span>
+                                     조리 가이드
+                                 </h3>
+                                 <div className="space-y-6">
+                                     {steps?.map((step: any, i: number) => (
+                                         <div key={i} className="relative pl-6 border-l-2 border-blue-100 last:border-0 hover:border-blue-300 transition-colors">
+                                             <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-blue-500 border-4 border-white shadow-sm"></div>
+                                             <h4 className="font-bold text-slate-800 mb-1">Step {step.step}</h4>
+                                             <p className="text-slate-600 leading-relaxed mb-2">{step.action}</p>
+                                             {step.tip && (
+                                                 <div className="bg-blue-50 text-blue-800 text-sm p-2 rounded-lg inline-block">
+                                                     💡 Tip: {step.tip}
+                                                 </div>
+                                             )}
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         </div>
+
+                         {/* Chef Kick & Pairing */}
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             {/* Chef Kick */}
+                             <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200 relative overflow-hidden">
+                                 <div className="absolute top-0 right-0 p-4 opacity-10">
+                                     <ChefHat className="w-32 h-32" />
+                                 </div>
+                                 <h3 className="text-lg font-bold text-amber-900 mb-3 flex items-center z-10 relative">
+                                     <span className="text-2xl mr-2">👨‍🍳</span> 셰프의 킥 (Secret Tip)
+                                 </h3>
+                                 <p className="text-amber-800 font-medium leading-relaxed z-10 relative">
+                                     {chef_kick}
+                                 </p>
+                             </div>
+
+                             {/* Pairing */}
+                             <div className="bg-violet-50 p-6 rounded-2xl border border-violet-200 relative overflow-hidden">
+                                 <div className="absolute top-0 right-0 p-4 opacity-10">
+                                     <FileText className="w-32 h-32" />
+                                 </div>
+                                 <h3 className="text-lg font-bold text-violet-900 mb-3 flex items-center z-10 relative">
+                                     <span className="text-2xl mr-2">🍷</span> 추천 페어링
+                                 </h3>
+                                 <p className="text-violet-800 font-medium leading-relaxed z-10 relative">
+                                     {pairing}
+                                 </p>
+                             </div>
+                         </div>
+                     </div>
+                 )}
+             </div>
+
+             <div className="mt-4 flex justify-end pt-4 border-t border-slate-200">
+                <button 
+                    onClick={onClose}
+                    className="bg-slate-900 hover:bg-black text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-slate-200/50 transition-all hover:-translate-y-0.5"
+                >
+                    확인 완료
+                </button>
+             </div>
+          </div>
+      )
+  }
 
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden"
-      >
-        {/* Header */}
-        <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 relative z-10">
-            <div className="flex space-x-2">
-                {[1, 2, 3, 4].map((s) => (
-                    <div 
-                        key={s} 
-                        className={`w-3 h-3 rounded-full transition-colors ${
-                            step === s ? 'bg-slate-800 scale-125' : 
-                            step > s ? 'bg-green-500' : 'bg-slate-200'
-                        }`}
-                    />
-                ))}
+  // --- Render (Portal) ---
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
+
+  if (!mounted) return null
+
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking content
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col overflow-hidden relative"
+          >
+            {/* Header */}
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 relative z-10">
+                <div className="flex space-x-2">
+                    {[1, 2, 3, 4].map((s) => (
+                        <div 
+                            key={s} 
+                            className={`w-3 h-3 rounded-full transition-colors ${
+                                step === s ? 'bg-slate-800 scale-125' : 
+                                step > s ? 'bg-green-500' : 'bg-slate-200'
+                            }`}
+                        />
+                    ))}
+                </div>
+                {/* 닫기 버튼 */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose();
+                  }} 
+                  className="p-2 hover:bg-slate-200 rounded-full transition-colors cursor-pointer"
+                >
+                    <X className="w-5 h-5 text-black font-bold" />
+                </button>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors cursor-pointer">
-                <X className="w-5 h-5 text-black font-bold" />
-            </button>
-        </div>
 
-        {/* Content */}
-        {/* Content */}
-        <div className="flex-1 p-6 overflow-hidden relative">
-             {step === 1 && renderDetectionStep()}
-             {step === 2 && renderInventoryStep()}
-             {step === 3 && renderRecipeStep()}
-             {step === 4 && renderReportStep()}
+            {/* Content */}
+            <div className="flex-1 p-6 overflow-hidden relative">
+                 {step === 1 && renderDetectionStep()}
+                 {step === 2 && renderInventoryStep()}
+                 {step === 3 && renderRecipeStep()}
+                 {step === 4 && renderReportStep()}
 
-             {/* Add Item Form Popover (Global) */}
-             {showAddForm && (
-                <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/40" onClick={() => setShowAddForm(false)}>
-                    <div className="bg-white p-6 rounded-xl shadow-xl w-80 text-black" onClick={e => e.stopPropagation()}>
-                        <h3 className="font-bold text-lg mb-4 text-black">새 재료 추가</h3>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-sm text-black mb-1 font-bold">재료 이름</label>
-                                <input type="text" className="w-full border rounded px-3 py-2 text-black" placeholder="예: 우유" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} autoFocus />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-black mb-1 font-bold">구입 날짜</label>
-                                <input 
-                                    type="date" 
-                                    className="w-full border rounded px-3 py-2 text-black" 
-                                    value={newItem.purchaseDate} 
-                                    max={new Date().toISOString().split('T')[0]}
-                                    onChange={e => setNewItem({...newItem, purchaseDate: e.target.value})} 
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-black mb-1 font-bold">유통기한</label>
-                                <input type="date" className="w-full border rounded px-3 py-2 text-black" value={newItem.expiryDate} onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} />
-                            </div>
-                            <div className="flex justify-end space-x-2 mt-2">
-                                <button onClick={() => { setShowAddForm(false); setCurrentBox(null); }} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded">취소</button>
-                                <button onClick={handleAddItem} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" disabled={!newItem.name}>추가</button>
+                 {/* Add Item Form Popover (Global) */}
+                 {showAddForm && (
+                    <div className="absolute inset-0 flex items-center justify-center z-50 bg-black/40" onClick={() => setShowAddForm(false)}>
+                        <div className="bg-white p-6 rounded-xl shadow-xl w-80 text-black" onClick={e => e.stopPropagation()}>
+                            <h3 className="font-bold text-lg mb-4 text-black">새 재료 추가</h3>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm text-black mb-1 font-bold">재료 이름</label>
+                                    <input type="text" className="w-full border rounded px-3 py-2 text-black" placeholder="예: 우유" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} autoFocus />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-black mb-1 font-bold">구입 날짜</label>
+                                    <input 
+                                        type="date" 
+                                        className="w-full border rounded px-3 py-2 text-black" 
+                                        value={newItem.purchaseDate} 
+                                        max={new Date().toISOString().split('T')[0]}
+                                        onChange={e => setNewItem({...newItem, purchaseDate: e.target.value})} 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm text-black mb-1 font-bold">유통기한</label>
+                                    <input type="date" className="w-full border rounded px-3 py-2 text-black" value={newItem.expiryDate} onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} />
+                                </div>
+                                <div className="flex justify-end space-x-2 mt-2">
+                                    <button onClick={() => { setShowAddForm(false); setCurrentBox(null); }} className="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded">취소</button>
+                                    <button onClick={handleAddItem} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700" disabled={!newItem.name}>추가</button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-             )}
+                 )}
+            </div>
+          </motion.div>
         </div>
-      </motion.div>
-    </div>
+      )}
+    </AnimatePresence>,
+    document.body
   )
 }

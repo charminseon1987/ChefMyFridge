@@ -212,54 +212,70 @@ async def get_recipes_by_diet_type(
 
 
 async def generate_recipe_report(recipe_title: str, ingredients: List[str]) -> Dict[str, Any]:
-    """선택된 레시피에 대한 상세 블로그 보고서 생성"""
+    """선택된 레시피에 대한 상세 보고서 생성 (Structured JSON)"""
     import os
+    import json
     from openai import OpenAI
     
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
-        prompt = f"""
-        당신은 인기 요리 블로거이자 푸드 칼럼니스트입니다.
-        사용자가 선택한 요리: "{recipe_title}"
+        system_prompt = """You are a world-class chef and food columnist.
+        You must output a JSON object describing the recipe report.
+        The JSON must follow this structure:
+        {
+            "title": "Recipe Name",
+            "intro": "A catchy, 1-sentence emotional introduction.",
+            "stats": {
+                "time": "e.g. 20min",
+                "difficulty": "e.g. Easy/Medium/Hard",
+                "calories": "e.g. 450kcal"
+            },
+            "ingredients": [
+                {"name": "Ingredient Name", "amount": "Quantity", "note": "Preparation note (optional)"}
+            ],
+            "steps": [
+                {"step": 1, "action": "Clear instruction", "tip": "Helpful tip for this step"}
+            ],
+            "chef_kick": "A secret tip to make it taste professional",
+            "pairing": "Drink or side dish recommendation"
+        }
+        """
+
+        user_prompt = f"""
+        Recipe: "{recipe_title}"
+        Available Ingredients: {', '.join(ingredients)}
         
-        사용자가 가진 냉장고 재료: {', '.join(ingredients)}
-        
-        이 요리에 대한 매력적이고 상세한 블로그 포스팅 스타일의 보고서를 작성해주세요.
-        다음 내용을 반드시 포함해야 합니다:
-        
-        1. **요리 소개 (Intro)**: 이 요리의 매력, 유래, 맛의 특징 등을 감성적으로 서술
-        2. **재료 준비 팁**: 가진 재료를 어떻게 손질하고 활용하면 좋은지 (특히 냉장고 재료 활용 팁)
-        3. **상세 조리 과정 (Step-by-Step)**: 초보자도 따라 할 수 있는 구체적인 가이드
-        4. **셰프의 킥 (Secret Tip)**: 맛을 한 단계 업그레이드할 수 있는 비법 (소스 비법, 불 조절 등)
-        5. **플레이팅 및 페어링 추천**: 예쁘게 담는 법과 어울리는 음료 또는 반찬
-        
-        톤앤매너: 친근하고 전문적이며, 독자의 식욕을 자극하는 문체 사용. 이모지 적절히 활용.
-        형식: 마크다운(Markdown) 형식으로 작성.
+        Write a structured recipe report.
+        - Tone: Professional yet friendly, appetizing.
+        - Language: Korean (Hangul).
         """
         
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "당신은 세계적인 요리 블로거입니다."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
             ],
-            max_tokens=2000,
+            response_format={"type": "json_object"},
             temperature=0.7
         )
         
-        report_content = response.choices[0].message.content
+        content_str = response.choices[0].message.content
+        report_data = json.loads(content_str)
         
         return {
             "title": recipe_title,
-            "content": report_content,
-            "author": "Secret Chef Agent"
+            "content": report_data, # JSON object
+            "author": "Secret Chef Agent",
+            "format": "json"
         }
         
     except Exception as e:
         logger.error(f"레시피 보고서 생성 오류: {e}")
         return {
             "title": recipe_title,
-            "content": f"보고서 생성 중 오류가 발생했습니다: {str(e)}",
-            "author": "System"
+            "content": {"error": f"보고서 생성 실패: {str(e)}"},
+            "author": "System",
+            "format": "error"
         }

@@ -164,3 +164,23 @@ async def generate_report_endpoint(
             status_code=500,
             detail=f"보고서 생성 중 오류가 발생했습니다: {str(e)}"
         )
+
+@router.post("/chat")
+async def chat_with_fridge(
+    request_data: Dict[str, Any] = Body(...)
+):
+    """냉장고 데이터 기반 챗봇 질의응답"""
+    try:
+        user_message = request_data.get("message")
+        if not user_message:
+            raise HTTPException(status_code=400, detail="질문 내용이 필요합니다")
+            
+        from ..agents.qa_agent import answer_user_question
+        
+        reply = await answer_user_question(user_message)
+        
+        return JSONResponse(content={"reply": reply})
+        
+    except Exception as e:
+        logger.error(f"채팅 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"챗봇 오류: {str(e)}")

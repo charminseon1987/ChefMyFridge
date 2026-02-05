@@ -26,3 +26,6 @@ pydantic>=2.0.0
 # Development
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
+
+# Database
+httpx>=0.24.0

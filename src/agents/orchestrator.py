@@ -69,6 +69,14 @@ async def run_orchestrator(image_path: Optional[str] = None, image_data: Optiona
             ).total_seconds()
         }
         
+        from ..core.supabase_client import SupabaseManager
+        
+        # Save results to Supabase
+        combined_inventory = final_state.get("expiry_data", [])
+        if combined_inventory:
+            logger.info(f"Saving {len(combined_inventory)} items to Supabase...")
+            await SupabaseManager().save_inventory_items(combined_inventory)
+            
         logger.info(f"오케스트레이터 완료: {result['current_step']}")
         
         return result
