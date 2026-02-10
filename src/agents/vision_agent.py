@@ -37,32 +37,75 @@ def vision_agent_node(state: FridgeState) -> FridgeState:
             messages=[
                 {
                     "role": "system",
-                    "content": """당신은 식재료 인식 전문가입니다. 냉장고나 식재료 사진에서 모든 식품을 정확히 인식하고 분류하세요.
+                    "content": """당신은 최고 수준의 컴퓨터 비전 전문가입니다. 냉장고/식재료 사진을 매우 세밀하게 분석하여 **보이는 모든 식품을 빠짐없이** 인식하고 위치를 파악하세요.
 
-중요:
-1. bounding box(bbox_2d)는 물체의 외곽선에 딱 맞게(tight fit) 매우 정확하게 설정해야 합니다. 여백을 두지 마세요.
-2. 겹쳐져 있는 물체나 가려진 물체도 최대한 개별적으로 식별하세요.
-3. 용기나 그릇에 담긴 음식도 내용물을 기준으로 식별하세요.
+**🔍 완벽한 인식 규칙 (매우 중요!):**
+1. **모든 물체 탐지**: 크기와 관계없이 보이는 모든 식재료를 찾으세요
+2. **작은 물체도 포함**: 일부만 보이거나 작은 항목도 절대 놓치지 마세요
+3. **겹친 물체 분리**: 겹쳐진 물체들을 각각 개별적으로 인식하세요
+4. **용기 내용물**: 병, 통, 팩 안에 담긴 내용물도 반드시 분석하세요
+5. **배경 물체**: 뒤쪽이나 구석에 있는 물체도 포함하세요
+6. **부분 가림**: 일부가 가려졌어도 보이는 부분으로 추론하세요
+7. **최소 목표**: 일반적인 냉장고는 10~30개 항목이 있습니다. 최대한 많이 찾으세요
 
-각 식재료에 대해 다음 정보를 제공하세요:
-- name: 식재료 이름 (한국어). 구체적으로 명시 (예: '야채' 대신 '시금치', '사과' 등)
-- category: 카테고리 (채소, 육류, 유제품, 과일, 기타)
+**📍 Bounding Box 좌표 생성 (필수):**
+이미지 = 1000x1000 좌표계
+- 왼쪽 위 = (0, 0)
+- 오른쪽 아래 = (1000, 1000)
+- bbox_2d = [ymin, xmin, ymax, xmax]
+- 각 물체의 **정확한 실제 위치**를 보고 좌표 추정
+
+**좌표 예시:**
+- 왼쪽 위: [50, 50, 300, 300]
+- 중앙: [350, 350, 650, 650]
+- 오른쪽 아래: [700, 700, 950, 950]
+- 상단 중앙: [50, 400, 300, 600]
+- 하단 왼쪽: [700, 50, 950, 300]
+
+**📝 각 식재료 정보:**
+- name: 식재료 이름 (한국어, 구체적으로. "야채" ❌ "시금치" ✅)
+- category: 채소/육류/유제품/과일/기타
 - quantity: 수량 (숫자)
-- unit: 단위 (개, g, ml 등)
-- freshness: 신선도 상태 (좋음, 보통, 나쁨)
-- packaging: 포장 상태 (밀봉, 개봉, 비닐포장 등)
-- confidence: 신뢰도 (0.0-1.0)
-- bbox_2d: 위치 좌표 [ymin, xmin, ymax, xmax] (0~1000 정수 스케일). ymin=위쪽 가장자리, xmin=왼쪽 가장자리.
-- expiry_date_text: 이미지에서 보이는 유통기한 텍스트 (없으면 null)
+- unit: 개/g/ml/봉지/병 등
+- freshness: 좋음/보통/나쁨
+- packaging: 밀봉/개봉/비닐포장/병/캔 등
+- confidence: 0.0~1.0 (확실하면 0.9 이상)
+- bbox_2d: **반드시 포함** [ymin, xmin, ymax, xmax]
+- expiry_date_text: 보이는 날짜 (없으면 null)
 
-JSON 형식으로 응답하세요."""
+**JSON만 반환하세요. 설명 없이 {"items": [...]} 형식만.**"""
                 },
                 {
                     "role": "user",
                     "content": [
                         {
                             "type": "text",
-                            "text": "이 이미지에서 모든 식재료를 인식하고 JSON 형식으로 반환하세요. 형식: {\"items\": [{\"name\": \"당근\", \"category\": \"채소\", \"quantity\": 3, \"unit\": \"개\", \"freshness\": \"좋음\", \"packaging\": \"비닐포장\", \"confidence\": 0.95, \"bbox_2d\": [100, 200, 300, 400], \"expiry_date_text\": null}]}"
+                            "text": """🔍 이미지를 매우 세밀하게 분석하여 **보이는 모든 식재료**를 빠짐없이 찾아 JSON으로 반환하세요.
+
+**탐지 체크리스트:**
+✓ 앞쪽 물체 (명확히 보임)
+✓ 뒤쪽 물체 (일부 가려짐)
+✓ 작은 물체 (양념, 소스 등)
+✓ 큰 물체 (우유팩, 김치통 등)
+✓ 용기 내용물 (병 안, 통 안)
+✓ 겹쳐진 물체 (각각 분리)
+✓ 구석 물체 (냉장고 문, 선반 뒤)
+✓ 포장 식품 (봉지, 박스 등)
+
+**bbox_2d 좌표 (필수):**
+1. 이미지 = 1000x1000 좌표계
+2. 각 물체의 **실제 위치** 관찰
+3. [ymin, xmin, ymax, xmax] 추정
+4. 물체 크기에 맞게 bbox 설정
+
+**응답 형식:**
+{"items": [
+  {"name": "양배추", "category": "채소", "quantity": 1, "unit": "개", "freshness": "좋음", "packaging": "비닐", "confidence": 0.95, "bbox_2d": [80, 120, 320, 380], "expiry_date_text": null},
+  {"name": "우유", "category": "유제품", "quantity": 1, "unit": "병", "freshness": "좋음", "packaging": "병", "confidence": 0.98, "bbox_2d": [150, 450, 450, 650], "expiry_date_text": "2024.03.15"},
+  ... (모든 항목 포함)
+]}
+
+**중요: 최소 10개 이상 찾으세요. 보이는 모든 것을 포함하세요!**"""
                         },
                         {
                             "type": "image_url",
@@ -73,8 +116,8 @@ JSON 형식으로 응답하세요."""
                     ]
                 }
             ],
-            max_tokens=2000,
-            temperature=0.3
+            max_tokens=5000,
+            temperature=0.1
         )
         
         # 응답 파싱
@@ -101,39 +144,54 @@ JSON 형식으로 응답하세요."""
 
         logger.info(f"📊 Vision Agent - GPT에서 반환한 항목 수: {len(detected_items)}")
 
-        # bbox_2d가 없거나 유효하지 않은 항목에 기본 위치 할당 (그리드 형태)
-        # GPT-4 Vision은 bbox를 자동 생성하지 못하므로, 임시로 그리드 배치
+        # bbox_2d 유효성 검증 함수
         def has_valid_bbox(item):
             bbox = item.get("bbox_2d")
             if not bbox:
                 return False
             if not isinstance(bbox, list) or len(bbox) != 4:
                 return False
-            return all(isinstance(x, (int, float)) for x in bbox)
+            # 모든 값이 숫자이고 0~1000 범위인지 확인
+            try:
+                if not all(isinstance(x, (int, float)) for x in bbox):
+                    return False
+                if not all(0 <= x <= 1000 for x in bbox):
+                    return False
+                # ymin < ymax, xmin < xmax 확인
+                if bbox[0] >= bbox[2] or bbox[1] >= bbox[3]:
+                    return False
+                return True
+            except:
+                return False
 
+        # GPT가 제공한 bbox 확인
+        items_with_gpt_bbox = [item for item in detected_items if has_valid_bbox(item)]
         items_without_bbox = [item for item in detected_items if not has_valid_bbox(item)]
 
+        if items_with_gpt_bbox:
+            logger.info(f"✅ GPT가 {len(items_with_gpt_bbox)}개 항목의 bbox_2d를 제공했습니다")
+            for item in items_with_gpt_bbox:
+                logger.info(f"  📍 {item.get('name')}: {item.get('bbox_2d')}")
+
         if items_without_bbox:
-            logger.warning(f"⚠️ {len(items_without_bbox)}개 항목에 유효한 bbox_2d가 없어 자동 생성합니다")
+            logger.warning(f"⚠️ {len(items_without_bbox)}개 항목에 유효한 bbox_2d가 없어 그리드 배치합니다")
 
-            # 그리드로 배치 (2열, 각 항목 200x200 크기)
+            # 그리드로 배치 (3열, 각 항목 180x180 크기, 간격 200)
             for idx, item in enumerate(items_without_bbox):
-                row = idx // 2  # 행
-                col = idx % 2   # 열
+                row = idx // 3  # 행 (3열 그리드)
+                col = idx % 3   # 열
 
-                # 중앙에서 시작, 간격 250
-                x_start = 250 + (col * 250)
-                y_start = 100 + (row * 250)
+                # 좌표 계산 (여백 50, 간격 200)
+                x_start = 50 + (col * 200)
+                y_start = 50 + (row * 200)
 
                 item["bbox_2d"] = [
                     y_start,              # ymin
                     x_start,              # xmin
-                    y_start + 200,        # ymax
-                    x_start + 200         # xmax
+                    y_start + 180,        # ymax
+                    x_start + 180         # xmax
                 ]
-                logger.info(f"  ✅ {item.get('name')}: bbox_2d 자동 생성 → {item['bbox_2d']}")
-        else:
-            logger.info("✅ 모든 항목에 이미 유효한 bbox_2d가 있습니다")
+                logger.info(f"  🔷 {item.get('name')}: 그리드 위치 → {item['bbox_2d']}")
 
         # 디버그: 각 항목의 bbox_2d 확인
         for idx, item in enumerate(detected_items):
@@ -141,15 +199,20 @@ JSON 형식으로 응답하세요."""
             logger.info(f"항목 {idx+1}: {item.get('name')} - bbox_2d {bbox_status}: {item.get('bbox_2d')}")
 
         # confidence가 낮은 항목들을 unidentified_items로 분리
+        # 더 많은 항목을 표시하기 위해 threshold를 낮춤 (0.7 → 0.5)
         confirmed_items = []
         unidentified_items = []
 
+        CONFIDENCE_THRESHOLD = 0.5  # 낮춰서 더 많은 항목 포함
+
         for item in detected_items:
             confidence = item.get("confidence", 0.0)
-            if confidence >= 0.7:
+            if confidence >= CONFIDENCE_THRESHOLD:
                 confirmed_items.append(item)
             else:
                 unidentified_items.append(item)
+
+        logger.info(f"📊 신뢰도 기준 {CONFIDENCE_THRESHOLD}: 확정 {len(confirmed_items)}개, 미확인 {len(unidentified_items)}개")
         
         state["detected_items"] = confirmed_items
         state["unidentified_items"] = unidentified_items
