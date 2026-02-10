@@ -47,9 +47,17 @@ async def run_orchestrator(image_path: Optional[str] = None, image_data: Optiona
         final_state = graph.invoke(initial_state)
         
         # 결과 반환
+        detected_items = final_state.get("detected_items", [])
+
+        # 디버그: bbox_2d 확인
+        logger.info(f"📦 Orchestrator - detected_items 개수: {len(detected_items)}")
+        for idx, item in enumerate(detected_items):
+            has_bbox = "있음" if item.get("bbox_2d") else "없음"
+            logger.info(f"  항목 {idx+1}: {item.get('name')} - bbox_2d {has_bbox}: {item.get('bbox_2d')}")
+
         result = {
             "success": len(final_state.get("errors", [])) == 0,
-            "detected_items": final_state.get("detected_items", []),
+            "detected_items": detected_items,
             "unidentified_items": final_state.get("unidentified_items", []),
             "user_confirmed_items": final_state.get("user_confirmed_items", []),
             "expiry_data": final_state.get("expiry_data", []),
@@ -64,7 +72,7 @@ async def run_orchestrator(image_path: Optional[str] = None, image_data: Optiona
             "errors": final_state.get("errors", []),
             "current_step": final_state.get("current_step", "unknown"),
             "processing_time": (
-                (final_state.get("end_time") or datetime.now()) - 
+                (final_state.get("end_time") or datetime.now()) -
                 (final_state.get("start_time") or datetime.now())
             ).total_seconds()
         }

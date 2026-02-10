@@ -37,6 +37,16 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
     if (data && isOpen) {
       // AI 감지 항목에 type: 'ai' 추가
       const detected = (data.detected_items || []).map((item: any) => ({ ...item, type: 'ai' }))
+
+      // 디버그: 받은 데이터 확인
+      console.log('🔍 AnalysisModal - 받은 전체 데이터:', data)
+      console.log('🔍 AnalysisModal - detected_items 개수:', detected.length)
+      detected.forEach((item: any, idx: number) => {
+        console.log(`  항목 ${idx + 1}: ${item.name}`)
+        console.log(`    - bbox_2d:`, item.bbox_2d)
+        console.log(`    - type:`, item.type)
+      })
+
       setItems(detected)
       setRecipes(data.recipe_suggestions || [])
       setStep(1)
@@ -106,6 +116,14 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
   const aiItems = items.filter(i => i.type !== 'manual')
   const manualItems = items.filter(i => i.type === 'manual')
 
+  // 디버그: 렌더링 시 aiItems 확인
+  if (step === 1 && aiItems.length > 0) {
+    console.log('🎨 렌더링 - aiItems 개수:', aiItems.length)
+    aiItems.forEach((item: any, idx: number) => {
+      console.log(`  AI 항목 ${idx + 1}: ${item.name}, bbox_2d:`, item.bbox_2d, 'exists:', !!item.bbox_2d)
+    })
+  }
+
   // --- Step 1: Detection (Bounding Boxes) ---
   const renderDetectionStep = () => (
     <div className="flex flex-col h-full">
@@ -134,30 +152,21 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
              <img src={imageData} alt="Fridge" className="block max-w-full max-h-[50vh] w-auto h-auto object-contain pointer-events-none" />
              
              {/* Render AI Items Boxes */}
-             {aiItems.map((item, idx) => (
-                item.bbox_2d && (
+             {aiItems.map((item, idx) => {
+                // bbox_2d 유효성 검사
+                const hasBbox = item.bbox_2d &&
+                               Array.isArray(item.bbox_2d) &&
+                               item.bbox_2d.length === 4 &&
+                               item.bbox_2d.every((v: number) => typeof v === 'number')
+
+                if (!hasBbox) {
+                  console.warn(`⚠️ AI 항목 "${item.name}"에 유효한 bbox_2d가 없습니다:`, item.bbox_2d)
+                  return null
+                }
+
+                return (
                   <div
                     key={`ai-${idx}`}
-                    className="absolute border-2 border-red-500 bg-red-500/20 flex items-center justify-center pointer-events-none"
-                    style={{
-                      top: `${item.bbox_2d[0] / 10}%`,
-                      left: `${item.bbox_2d[1] / 10}%`,
-                      height: `${(item.bbox_2d[2] - item.bbox_2d[0]) / 10}%`,
-                      width: `${(item.bbox_2d[3] - item.bbox_2d[1]) / 10}%`,
-                    }}
-                  >
-                    <span className="bg-red-600 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10">
-                      {idx + 1}. {item.name}
-                    </span>
-                  </div>
-                )
-             ))}
-
-             {/* Render Manual Items Boxes (Blue) */}
-             {manualItems.map((item, idx) => (
-                item.bbox_2d && (
-                  <div
-                    key={`manual-${idx}`}
                     className="absolute border-2 border-blue-600 bg-blue-600/20 flex items-center justify-center pointer-events-none"
                     style={{
                       top: `${item.bbox_2d[0] / 10}%`,
@@ -171,11 +180,42 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                     </span>
                   </div>
                 )
-             ))}
+             })}
+
+             {/* Render Manual Items Boxes (Green) */}
+             {manualItems.map((item, idx) => {
+                // bbox_2d 유효성 검사
+                const hasBbox = item.bbox_2d &&
+                               Array.isArray(item.bbox_2d) &&
+                               item.bbox_2d.length === 4 &&
+                               item.bbox_2d.every((v: number) => typeof v === 'number')
+
+                if (!hasBbox) {
+                  console.warn(`⚠️ 수동 항목 "${item.name}"에 유효한 bbox_2d가 없습니다:`, item.bbox_2d)
+                  return null
+                }
+
+                return (
+                  <div
+                    key={`manual-${idx}`}
+                    className="absolute border-2 border-green-600 bg-green-600/20 flex items-center justify-center pointer-events-none"
+                    style={{
+                      top: `${item.bbox_2d[0] / 10}%`,
+                      left: `${item.bbox_2d[1] / 10}%`,
+                      height: `${(item.bbox_2d[2] - item.bbox_2d[0]) / 10}%`,
+                      width: `${(item.bbox_2d[3] - item.bbox_2d[1]) / 10}%`,
+                    }}
+                  >
+                    <span className="bg-green-600 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10">
+                      {idx + 1}. {item.name}
+                    </span>
+                  </div>
+                )
+             })}
 
              {currentBox && (
                  <div
-                    className="absolute border-2 border-blue-500 bg-blue-500/30 pointer-events-none z-30"
+                    className="absolute border-2 border-green-500 bg-green-500/30 pointer-events-none z-30"
                     style={{
                       top: `${currentBox[0] / 10}%`,
                       left: `${currentBox[1] / 10}%`,
@@ -199,7 +239,7 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                 {aiItems.map((item, idx) => (
                     <li key={`ai-list-${idx}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 shadow-sm">
                         <span className="flex items-center">
-                            <span className="bg-red-100 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs mr-3 font-bold border border-red-200">
+                            <span className="bg-blue-100 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs mr-3 font-bold border border-blue-200">
                                 {idx + 1}
                             </span>
                             <span className="font-medium text-black">{item.name}</span>
@@ -224,14 +264,14 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
             ) : (
                 <ul className="space-y-2">
                     {manualItems.map((item, idx) => (
-                        <li key={`manual-list-${idx}`} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200 shadow-sm">
+                        <li key={`manual-list-${idx}`} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 shadow-sm">
                             <span className="flex items-center">
-                                <span className="bg-blue-100 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs mr-3 font-bold border border-blue-200">
+                                <span className="bg-green-100 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs mr-3 font-bold border border-green-200">
                                     {idx + 1}
                                 </span>
                                 <span className="font-medium text-black">{item.name}</span>
                             </span>
-                            <span className="text-sm text-blue-600 font-bold">
+                            <span className="text-sm text-green-600 font-bold">
                                 직접 추가됨
                             </span>
                         </li>
