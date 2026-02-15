@@ -71,7 +71,7 @@ export default function ImageUpload({
 
     try {
       const response = await axios.post(
-        'http://localhost:8000/api/v1/analyze',
+        'http://127.0.0.1:8000/api/v1/analyze',
         formData,
         {
           headers: {
