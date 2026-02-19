@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Upload, Image as ImageIcon, X, Loader2 } from 'lucide-react'
+import { Upload, Image as ImageIcon, X, Loader2, Users, Utensils } from 'lucide-react'
 import axios from 'axios'
 
 interface ImageUploadProps {
@@ -19,6 +19,8 @@ export default function ImageUpload({
   const [dragActive, setDragActive] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [servings, setServings] = useState(2)
+  const [dietType, setDietType] = useState('general')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDrag = (e: React.DragEvent) => {
@@ -68,6 +70,8 @@ export default function ImageUpload({
 
     const formData = new FormData()
     formData.append('file', selectedFile)
+    formData.append('servings', servings.toString())
+    formData.append('diet_type', dietType)
 
     try {
       const response = await axios.post(
@@ -156,6 +160,41 @@ export default function ImageUpload({
               >
                 <X className="w-5 h-5 text-white" />
               </button>
+            </div>
+
+            {/* 설정 옵션 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/50 p-4 rounded-xl border border-slate-200">
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  <span>인분 (명)</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10"
+                  value={servings}
+                  onChange={(e) => setServings(parseInt(e.target.value) || 1)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+              
+              <div className="bg-white/50 p-4 rounded-xl border border-slate-200">
+                <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                  <Utensils className="w-4 h-4" />
+                  <span>식단 타입</span>
+                </label>
+                <select
+                  value={dietType}
+                  onChange={(e) => setDietType(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="general">일반식</option>
+                  <option value="diet">다이어트식 (저칼로리)</option>
+                  <option value="health">건강식 (균형잡힌)</option>
+                  <option value="patient">환자식 (소화잘되는)</option>
+                </select>
+              </div>
             </div>
 
             <motion.button

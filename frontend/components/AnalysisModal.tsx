@@ -116,6 +116,16 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
   const aiItems = items.filter(i => i.type !== 'manual')
   const manualItems = items.filter(i => i.type === 'manual')
 
+  // max_storage_days 조회 맵 (expiry_data에서 item 이름으로 룩업)
+  const expiryMap: Record<string, number> = {}
+  if (data?.expiry_data) {
+    data.expiry_data.forEach((e: any) => {
+      if (e.item && e.max_storage_days != null) {
+        expiryMap[e.item] = e.max_storage_days
+      }
+    })
+  }
+
   // 디버그: 렌더링 시 aiItems 확인
   if (step === 1 && aiItems.length > 0) {
     console.log('🎨 렌더링 - aiItems 개수:', aiItems.length)
@@ -164,10 +174,19 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                   return null
                 }
 
+                // YOLO 정확 매칭 → 실선/진한 파란색, GPT 추정 → 점선/연한 파란색
+                const isYoloAccurate = item.yolo_matched === true
+                const boxClassName = isYoloAccurate
+                  ? "absolute border-2 border-blue-600 bg-blue-600/20 flex items-center justify-center pointer-events-none"
+                  : "absolute border-2 border-dashed border-blue-400 bg-blue-400/10 flex items-center justify-center pointer-events-none"
+                const labelClassName = isYoloAccurate
+                  ? "bg-blue-600 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10"
+                  : "bg-blue-400 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10"
+
                 return (
                   <div
                     key={`ai-${idx}`}
-                    className="absolute border-2 border-blue-600 bg-blue-600/20 flex items-center justify-center pointer-events-none"
+                    className={boxClassName}
                     style={{
                       top: `${item.bbox_2d[0] / 10}%`,
                       left: `${item.bbox_2d[1] / 10}%`,
@@ -175,7 +194,7 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                       width: `${(item.bbox_2d[3] - item.bbox_2d[1]) / 10}%`,
                     }}
                   >
-                    <span className="bg-blue-600 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10">
+                    <span className={labelClassName}>
                       {idx + 1}. {item.name}
                     </span>
                   </div>
@@ -236,19 +255,32 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                 1. AI 감지 결과
             </h3>
             <ul className="space-y-2">
-                {aiItems.map((item, idx) => (
+                {aiItems.map((item, idx) => {
+                    const maxDays = expiryMap[item.name]
+                    return (
                     <li key={`ai-list-${idx}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 shadow-sm">
                         <span className="flex items-center">
                             <span className="bg-blue-100 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs mr-3 font-bold border border-blue-200">
                                 {idx + 1}
                             </span>
                             <span className="font-medium text-black">{item.name}</span>
+                            {!item.yolo_matched && (
+                                <span className="ml-2 text-xs text-blue-400 border border-blue-200 rounded px-1">추정</span>
+                            )}
                         </span>
-                        <span className="text-sm text-slate-500 font-medium">
-                            {(item.confidence * 100).toFixed(0)}%
+                        <span className="flex items-center gap-2">
+                            {maxDays != null && (
+                                <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">
+                                    최대 보관 {maxDays}일
+                                </span>
+                            )}
+                            <span className="text-sm text-slate-500 font-medium">
+                                {(item.confidence * 100).toFixed(0)}%
+                            </span>
                         </span>
                     </li>
-                ))}
+                    )
+                })}
             </ul>
         </div>
 
@@ -299,27 +331,73 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
       setItems(newItems)
   }
 
-  const renderInventoryStep = () => (
+  const renderInventoryStep = () => {
+    const expiryData: any[] = data?.expiry_data || []
+    const urgencyOrder: Record<string, number> = { '만료됨': 0, '즉시소비': 1, '3일이내': 2, '1주이내': 3 }
+    const urgentItems = expiryData
+      .filter((e: any) => Object.keys(urgencyOrder).includes(e.urgency))
+      .sort((a: any, b: any) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency])
+
+    const urgencyStyle = (urgency: string) => {
+      switch (urgency) {
+        case '만료됨':   return { row: 'bg-red-50 border-red-300',    badge: 'bg-red-600 text-white',    icon: '🚨', label: '보관기한 초과' }
+        case '즉시소비': return { row: 'bg-orange-50 border-orange-300', badge: 'bg-orange-500 text-white', icon: '⚠️', label: '오늘 소비 권장' }
+        case '3일이내':  return { row: 'bg-amber-50 border-amber-300',  badge: 'bg-amber-500 text-white',  icon: '⚠️', label: '3일 이내 소비' }
+        case '1주이내':  return { row: 'bg-yellow-50 border-yellow-300', badge: 'bg-yellow-500 text-white', icon: '📅', label: '1주일 이내 소비' }
+        default:         return { row: 'bg-white border-slate-200',     badge: 'bg-green-500 text-white',  icon: '✅', label: '안전' }
+      }
+    }
+
+    return (
     <div className="flex flex-col h-full">
-      <h2 className="text-2xl font-bold mb-4 flex items-center text-black">
+      <h2 className="text-2xl font-bold mb-3 flex items-center text-black">
         <Calendar className="w-6 h-6 mr-2 text-blue-600" />
         유통기한/구매일 확인
       </h2>
-      <p className="text-black mb-4">정확한 추천을 위해 날짜를 확인해주세요.</p>
-      
-      <div className="flex-1 overflow-y-auto space-y-3 p-1">
-        {items.map((item, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm">
-                <div className="font-medium text-lg text-black">{item.name}</div>
+
+      {/* 긴급 알림 배너 */}
+      {urgentItems.length > 0 && (
+        <div className="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+          <p className="text-sm font-bold text-red-700 mb-2">⚠️ 주의가 필요한 식재료 ({urgentItems.length}개)</p>
+          <ul className="space-y-1">
+            {urgentItems.map((e: any, i: number) => {
+              const s = urgencyStyle(e.urgency)
+              return (
+                <li key={i} className={`flex items-center justify-between px-3 py-1.5 rounded border ${s.row}`}>
+                  <span className="font-medium text-sm text-slate-800">{e.icon || s.icon} {e.item}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${s.badge}`}>{s.label}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto space-y-2 p-1">
+        {items.map((item, idx) => {
+            const expiryEntry = expiryData.find((e: any) => e.item === item.name)
+            const s = urgencyStyle(expiryEntry?.urgency || '안전')
+            return (
+            <div key={idx} className={`flex items-center justify-between p-3 border rounded-lg shadow-sm ${s.row}`}>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-black">{item.name}</span>
+                  {expiryEntry?.urgency && expiryEntry.urgency !== '안전' && (
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${s.badge}`}>
+                      {expiryEntry.urgency}
+                    </span>
+                  )}
+                  {expiryEntry?.max_storage_days != null && (
+                    <span className="text-xs text-slate-500">최대 {expiryEntry.max_storage_days}일</span>
+                  )}
+                </div>
                 <div className="flex items-center space-x-2">
-                    {/* 채소/과일/수산물 등은 구매일 입력 권장, 나머지는 유통기한 */}
                     {['채소', '과일', '수산물', '정육', '기타'].includes(item.category) ? (
                         <div className="flex flex-col">
                              <label className="text-xs text-black font-medium">구매일</label>
-                             <input 
-                                type="date" 
+                             <input
+                                type="date"
                                 className="border rounded px-2 py-1 text-sm bg-blue-50 text-black"
-                                value={item.purchase_date || new Date().toISOString().split('T')[0]} // 기본값 오늘
+                                value={item.purchase_date || new Date().toISOString().split('T')[0]}
                                 max={new Date().toISOString().split('T')[0]}
                                 onChange={(e) => handleDateChange(idx, 'purchase', e.target.value)}
                              />
@@ -327,8 +405,8 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                     ) : (
                         <div className="flex flex-col">
                              <label className="text-xs text-black font-medium">유통기한</label>
-                             <input 
-                                type="date" 
+                             <input
+                                type="date"
                                 className="border rounded px-2 py-1 text-sm bg-red-50 text-black"
                                 value={item.expiry_date || item.expiry_date_text || ''}
                                 onChange={(e) => handleDateChange(idx, 'expiry', e.target.value)}
@@ -337,11 +415,10 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                     )}
                 </div>
             </div>
-        ))}
-        
-        {/* 아이템 추가 버튼 (Placeholder) */}
-        {/* 아이템 추가 버튼 */}
-        <button 
+            )
+        })}
+
+        <button
             onClick={() => setShowAddForm(true)}
             className="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors"
         >
@@ -353,7 +430,7 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
          <button onClick={() => setStep(1)} className="text-slate-500 px-4 py-2 hover:bg-slate-100 rounded">
             이전
          </button>
-        <button 
+        <button
           onClick={() => setStep(3)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center"
         >
@@ -361,7 +438,8 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
         </button>
       </div>
     </div>
-  )
+    )
+  }
 
   // --- Step 3: Recipe Selection ---
   const handleRecipeSelect = async (recipe: any) => {

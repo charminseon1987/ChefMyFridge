@@ -9,6 +9,8 @@ class FridgeState(TypedDict):
     # 입력
     image_path: Optional[str]
     image_data: Optional[bytes]
+    servings: int  # 인분 수
+    diet_type: str  # 식단 타입 (general, diet, health, patient)
     
     # Vision Agent 결과
     detected_items: List[Dict[str, Any]]

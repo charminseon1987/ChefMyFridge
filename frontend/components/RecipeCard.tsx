@@ -3,27 +3,9 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Clock, ChefHat, Flame } from 'lucide-react'
-import RecipeDetail from './RecipeDetail'
+import RecipeDetail, { Recipe, Ingredient } from './RecipeDetail'
 
-interface Ingredient {
-  name: string
-  amount?: string
-  gram?: number
-}
 
-interface Recipe {
-  id: string
-  title: string
-  description: string
-  cookingTime: string
-  difficulty: '초' | '중' | '고'
-  ingredients: string[] | Ingredient[]
-  calories?: number
-  image?: string
-  steps?: any[]
-  youtubeId?: string
-  recommendedVideos?: any[]
-}
 
 interface RecipeCardProps {
   recipe: Recipe

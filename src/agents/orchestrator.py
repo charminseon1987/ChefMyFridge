@@ -8,11 +8,18 @@ from ..core.graph import create_fridge_graph
 logger = logging.getLogger(__name__)
 
 
-def initialize_state(image_path: Optional[str] = None, image_data: Optional[bytes] = None) -> FridgeState:
+def initialize_state(
+    image_path: Optional[str] = None, 
+    image_data: Optional[bytes] = None,
+    servings: int = 2,
+    diet_type: str = "general"
+) -> FridgeState:
     """초기 State 생성"""
     return FridgeState(
         image_path=image_path,
         image_data=image_data,
+        servings=servings,
+        diet_type=diet_type,
         detected_items=[],
         unidentified_items=[],
         user_confirmed_items=[],
@@ -32,13 +39,18 @@ def initialize_state(image_path: Optional[str] = None, image_data: Optional[byte
     )
 
 
-async def run_orchestrator(image_path: Optional[str] = None, image_data: Optional[bytes] = None) -> Dict[str, Any]:
+async def run_orchestrator(
+    image_path: Optional[str] = None, 
+    image_data: Optional[bytes] = None,
+    servings: int = 2,
+    diet_type: str = "general"
+) -> Dict[str, Any]:
     """오케스트레이터 실행"""
     try:
-        logger.info("오케스트레이터 시작")
+        logger.info(f"오케스트레이터 시작 (인분: {servings}, 식단: {diet_type})")
         
         # State 초기화
-        initial_state = initialize_state(image_path, image_data)
+        initial_state = initialize_state(image_path, image_data, servings, diet_type)
         
         # 그래프 생성 및 실행
         graph = create_fridge_graph()

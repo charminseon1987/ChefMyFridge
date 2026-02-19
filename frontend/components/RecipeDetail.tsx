@@ -3,29 +3,29 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { X, Clock, ChefHat, Utensils, Youtube } from 'lucide-react'
+import { X, Clock, ChefHat, Utensils, Youtube, ShoppingCart, CheckCircle2 } from 'lucide-react'
 
-interface Ingredient {
+export interface Ingredient {
   name: string
-  amount: string // 예: "200g", "1개", "2큰술"
+  amount?: string // 예: "200g", "1개", "2큰술"
   gram?: number // 그램 수 (선택사항)
 }
 
-interface RecipeStep {
+export interface RecipeStep {
   step: number
   description: string
   duration?: string // 예: "5분", "2-3분"
   tip?: string // 팁 (선택사항)
 }
 
-interface SauceRecipe {
+export interface SauceRecipe {
   name: string
   ingredients: Ingredient[]
   steps: string[]
   tip?: string
 }
 
-interface Recipe {
+export interface Recipe {
   id: string
   title: string
   description: string
@@ -44,6 +44,7 @@ interface Recipe {
   }>
   sauces?: SauceRecipe[] // 양념/소스 비법
   tips?: string[] // 전체적인 팁들
+  missing_ingredients?: string[] // 부족한 재료 (쇼핑 리스트)
 }
 
 interface RecipeDetailProps {
@@ -291,33 +292,56 @@ export default function RecipeDetail({ recipe, onClose }: RecipeDetailProps) {
               )}
             </div>
 
-            {/* 재료 목록 */}
+            {/* 쇼핑 리스트 (부족한 재료) */}
+            {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (
+              <div className="glass-rose rounded-xl p-6 border-2 border-rose-200">
+                <h3 className="text-xl font-bold text-rose-700 mb-4 flex items-center space-x-2">
+                  <ShoppingCart className="w-6 h-6" />
+                  <span>쇼핑 리스트 (부족한 재료)</span>
+                </h3>
+                <div className="bg-white/80 rounded-lg p-4">
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {recipe.missing_ingredients.map((item, idx) => (
+                      <li key={idx} className="flex items-center space-x-2 text-rose-600 font-medium">
+                        <div className="w-5 h-5 rounded-full border-2 border-rose-400 flex items-center justify-center">
+                          <div className="w-2.5 h-2.5 rounded-full bg-rose-400 opacity-0 hover:opacity-100 transition-opacity cursor-pointer"></div>
+                        </div>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-rose-400 mt-4 text-right">* 체크박스를 클릭하여 구매 완료 표시 (구현 예정)</p>
+                </div>
+              </div>
+            )}
+
+            {/* 재료 목록 (인포그래픽 스타일) */}
             <div className="glass rounded-xl p-6">
-              <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center space-x-2">
-                <Utensils className="w-5 h-5" />
+              <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center space-x-2">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <Utensils className="w-6 h-6 text-emerald-600" />
+                </div>
                 <span>필요한 재료</span>
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {ingredients.map((ingredient, index) => (
                   <motion.div
                     key={index}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: index * 0.05 }}
-                    className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-all"
+                    className="flex flex-col items-center justify-center p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-200 transition-all text-center aspect-square"
                   >
-                    <div className="flex items-center space-x-3 flex-1">
-                      <div className="w-2 h-2 rounded-full bg-slate-400"></div>
-                      <span className="text-slate-700 font-medium">{ingredient.name}</span>
+                    <div className="w-10 h-10 mb-3 rounded-full bg-slate-100 flex items-center justify-center text-xl">
+                      🥗
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-slate-600 text-sm font-semibold">{ingredient.amount}</span>
-                      {ingredient.gram && (
-                        <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded">
-                          {ingredient.gram}g
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-slate-700 font-bold mb-1 break-keep">{ingredient.name}</span>
+                    <span className="text-slate-500 text-sm">{ingredient.amount}</span>
+                    {ingredient.gram && (
+                      <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                        {ingredient.gram}g
+                      </span>
+                    )}
                   </motion.div>
                 ))}
               </div>
@@ -381,44 +405,54 @@ export default function RecipeDetail({ recipe, onClose }: RecipeDetailProps) {
               </div>
             )}
 
-            {/* 조리 단계 */}
             <div className="glass rounded-xl p-6">
-              <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center space-x-2">
-                <ChefHat className="w-5 h-5" />
+              <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center space-x-2">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <ChefHat className="w-6 h-6 text-orange-600" />
+                </div>
                 <span>조리 방법</span>
               </h3>
-              <ol className="space-y-4">
+              <div className="relative border-l-2 border-slate-200 ml-4 space-y-8 pb-4">
                 {steps.map((step, index) => (
-                  <motion.li
+                  <motion.div
                     key={index}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="flex space-x-4"
+                    className="relative pl-8"
                   >
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-white flex items-center justify-center font-bold shadow-md">
-                        {step.step}
+                    {/* 타임라인 점 */}
+                    <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-orange-500 border-4 border-white shadow-sm"></div>
+                    
+                    <div className="bg-white rounded-xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3">
+                        <span className="inline-block px-3 py-1 bg-slate-800 text-white text-xs font-bold rounded-lg mb-2 sm:mb-0">
+                          STEP {step.step}
+                        </span>
+                        {step.duration && (
+                          <div className="flex items-center text-xs text-slate-500 font-semibold bg-slate-100 px-2 py-1 rounded-md">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {step.duration}
+                          </div>
+                        )}
                       </div>
-                      {step.duration && (
-                        <div className="mt-2 text-xs text-center text-slate-500 font-semibold">
-                          {step.duration}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 pt-1">
-                      <p className="text-slate-700 leading-relaxed">{step.description}</p>
+                      
+                      <p className="text-slate-700 text-lg leading-relaxed font-medium mb-3">
+                        {step.description}
+                      </p>
+                      
                       {step.tip && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded-lg border-l-4 border-blue-400">
+                        <div className="flex items-start p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                          <span className="text-blue-500 mr-2 mt-0.5">💡</span>
                           <p className="text-sm text-slate-600">
-                            <span className="font-semibold text-blue-700">💡 팁:</span> {step.tip}
+                            <span className="font-semibold text-blue-700">Chef's Tip:</span> {step.tip}
                           </p>
                         </div>
                       )}
                     </div>
-                  </motion.li>
+                  </motion.div>
                 ))}
-              </ol>
+              </div>
             </div>
 
             {/* 전체적인 팁 */}

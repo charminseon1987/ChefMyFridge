@@ -1,6 +1,9 @@
 """Recipe Agent - 레시피 추천"""
 from typing import Dict, Any, List, Optional
 import logging
+import os
+import json
+from openai import OpenAI
 from ..core.state import FridgeState
 from ..rag.vector_store import get_vector_store
 
@@ -23,99 +26,124 @@ def calculate_match_rate(recipe_ingredients: List[str], available_ingredients: L
     return matched / len(recipe_ingredients)
 
 
+def generate_recipes_with_gpt(
+    available_ingredients: List[str],
+    urgent_items: List[str]
+) -> List[Dict[str, Any]]:
+    """GPT-4o로 보유 재료 기반 레시피 동적 생성"""
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    urgent_note = ""
+    if urgent_items:
+        urgent_note = f"\n⚠️ 유통기한 임박 재료 (반드시 우선 활용): {', '.join(urgent_items)}"
+
+    prompt = f"""냉장고에 다음 식재료가 있습니다:
+{', '.join(available_ingredients)}
+{urgent_note}
+
+위 재료를 최대한 활용하여 만들 수 있는 한국 요리 5가지를 추천해주세요.
+유통기한 임박 재료가 있다면 그 재료를 사용하는 레시피를 우선 포함하세요.
+
+각 레시피는 반드시 아래 JSON 형식으로 반환하세요:
+{{
+  "recipes": [
+    {{
+      "title": "레시피 이름",
+      "description": "한 줄 설명",
+      "ingredients": ["재료1", "재료2", ...],
+      "missing_ingredients": ["보유하지 않은 추가 재료"],
+      "cooking_time": "20분",
+      "difficulty": "하/중/상",
+      "calories": 300,
+      "uses_urgent": true
+    }}
+  ]
+}}
+
+규칙:
+- 보유 재료를 최대한 활용하는 현실적인 레시피
+- 5가지 모두 서로 다른 요리 (볶음, 국, 무침, 구이, 샐러드 등 다양하게)
+- 매번 다른 창의적인 조합 추천
+- JSON만 반환"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "당신은 한국 요리 전문 셰프입니다. 주어진 재료로 만들 수 있는 창의적이고 맛있는 레시피를 추천합니다."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.9
+        )
+        result = json.loads(response.choices[0].message.content)
+        recipes = result.get("recipes", [])
+        logger.info(f"✅ GPT-4o 레시피 생성 완료: {len(recipes)}개")
+        return recipes
+    except Exception as e:
+        logger.error(f"GPT-4o 레시피 생성 오류: {e}")
+        return []
+
+
 def recipe_agent_node(state: FridgeState) -> FridgeState:
-    """Recipe Agent 노드 - 레시피 검색 및 추천"""
+    """Recipe Agent 노드 - GPT-4o 기반 동적 레시피 추천"""
     try:
         logger.info("Recipe Agent 시작")
-        
+
         detected_items = state.get("detected_items", [])
         user_confirmed_items = state.get("user_confirmed_items", [])
         expiry_data = state.get("expiry_data", [])
-        
-        # 보유 재료 목록 추출 (인식된 재료 + 사용자 확인 재료)
+
         all_items = detected_items + user_confirmed_items
-        
+
         if not all_items:
             logger.warning("인식된 식재료가 없습니다")
             state["recipe_suggestions"] = []
             state["current_step"] = "recipe_completed"
             return state
-        
-        # 보유 재료 목록 추출
-        available_ingredients = [item.get("name", "") for item in all_items]
-        
-        # 유통기한 임박 재료 우선 추출
+
+        available_ingredients = [item.get("name", "") for item in all_items if item.get("name")]
+
         urgent_items = [
-            item["item"] for item in expiry_data 
+            item["item"] for item in expiry_data
             if item.get("urgency") in ["즉시소비", "3일이내"]
         ]
-        
-        # 벡터 저장소에서 레시피 검색
-        vector_store = get_vector_store()
-        recipes = vector_store.search_recipes(available_ingredients, top_k=10)
-        
-        # 매칭률 계산 및 정렬
+
+        # GPT-4o로 보유 재료 기반 레시피 동적 생성
+        logger.info(f"GPT-4o 레시피 생성 중... 재료: {available_ingredients[:10]}")
+        raw_recipes = generate_recipes_with_gpt(available_ingredients, urgent_items)
+
         recipe_suggestions = []
-        for recipe in recipes:
+        for recipe in raw_recipes:
             recipe_ingredients = recipe.get("ingredients", [])
             match_rate = calculate_match_rate(recipe_ingredients, available_ingredients)
-            
-            # 부족한 재료 확인
-            missing_ingredients = [
-                ing for ing in recipe_ingredients 
-                if not any(ing in avail or avail in ing for avail in available_ingredients)
-            ]
-            
-            # 우선순위 점수 계산 (5성급 호텔 수준 평가)
-            priority_score = match_rate * 100
-            
-            # 유통기한 임박 재료 포함 시 보너스
-            if any(item in recipe_ingredients for item in urgent_items):
-                priority_score += 30
-            
-            # 고급 요리 보너스 (5성급 호텔 수준)
-            recipe_title = recipe.get("title", "").lower()
-            recipe_desc = recipe.get("description", "").lower()
-            gourmet_keywords = ["프레젠테이션", "정교", "고급", "미슐랭", "스타", "레스토랑", "파인다이닝", 
-                               "소스", "가니쉬", "플레이팅", "감각", "창의", "정성", "수준"]
-            if any(keyword in recipe_title or keyword in recipe_desc for keyword in gourmet_keywords):
-                priority_score += 25
-            
-            # 간단한 조리법 보너스 (하지만 너무 단순하면 감점)
-            if recipe.get("difficulty") == "하":
-                priority_score += 10  # 너무 단순하면 감점
-            elif recipe.get("difficulty") == "상":
-                priority_score += 15  # 정교한 요리는 보너스
-            
-            recipe_suggestion = {
+            uses_urgent = recipe.get("uses_urgent", False) or any(
+                u in recipe_ingredients for u in urgent_items
+            )
+            priority_score = match_rate * 100 + (30 if uses_urgent else 0)
+
+            recipe_suggestions.append({
                 "title": recipe.get("title", ""),
                 "match_rate": round(match_rate, 2),
                 "ingredients_needed": recipe_ingredients,
-                "missing_ingredients": missing_ingredients,
+                "missing_ingredients": recipe.get("missing_ingredients", []),
                 "cooking_time": recipe.get("cooking_time", ""),
-                "difficulty": recipe.get("difficulty", ""),
+                "difficulty": recipe.get("difficulty", "중"),
                 "calories": recipe.get("calories", 0),
                 "description": recipe.get("description", ""),
                 "priority_score": priority_score,
-                "priority_reason": "유통기한 임박 재료 포함" if any(item in recipe_ingredients for item in urgent_items) else ""
-            }
-            
-            recipe_suggestions.append(recipe_suggestion)
-        
-        # 우선순위 점수로 정렬
+                "priority_reason": "유통기한 임박 재료 포함" if uses_urgent else ""
+            })
+
         recipe_suggestions.sort(key=lambda x: x["priority_score"], reverse=True)
-        
-        # 상위 5개만 선택
         recipe_suggestions = recipe_suggestions[:5]
-        
-        # State 업데이트
+
         state["recipe_suggestions"] = recipe_suggestions
         state["current_step"] = "recipe_completed"
-        
+
         logger.info(f"Recipe Agent 완료: {len(recipe_suggestions)}개 레시피 추천")
-        
         return state
-        
+
     except Exception as e:
         logger.error(f"Recipe Agent 오류: {e}")
         state["errors"].append(f"Recipe Agent 오류: {str(e)}")
@@ -211,12 +239,11 @@ async def get_recipes_by_diet_type(
         return []
 
 
-async def generate_recipe_report(recipe_title: str, ingredients: List[str]) -> Dict[str, Any]:
-    """선택된 레시피에 대한 상세 보고서 생성 (Structured JSON)"""
-    import os
-    import json
-    from openai import OpenAI
-    
+async def generate_recipe_report(
+    recipe_title: str, 
+    ingredients: List[str],
+    servings: int = 2
+) -> Dict[str, Any]:
     try:
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
@@ -245,8 +272,10 @@ async def generate_recipe_report(recipe_title: str, ingredients: List[str]) -> D
         user_prompt = f"""
         Recipe: "{recipe_title}"
         Available Ingredients: {', '.join(ingredients)}
+        Servings: {servings} people
         
         Write a structured recipe report.
+        - IMPORTANT: Adjust all ingredient amounts to match {servings} servings.
         - Tone: Professional yet friendly, appetizing.
         - Language: Korean (Hangul).
         """

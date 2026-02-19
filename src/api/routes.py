@@ -1,5 +1,5 @@
 """API 라우트"""
-from fastapi import APIRouter, UploadFile, File, HTTPException, Body
+from fastapi import APIRouter, UploadFile, File, HTTPException, Body, Form
 from fastapi.responses import JSONResponse
 import os
 import tempfile
@@ -14,8 +14,12 @@ router = APIRouter(prefix="/api/v1", tags=["fridge"])
 
 
 @router.post("/analyze")
-async def analyze_fridge_image(file: UploadFile = File(...)):
-    """냉장고 이미지 분석"""
+async def analyze_fridge_image(
+    file: UploadFile = File(...),
+    servings: int = Form(2),
+    diet_type: str = Form("general")
+):
+    """냉장고 이미지 분석 (인분, 식단 타입 포함)"""
     try:
         # 파일 검증
         if not file.content_type.startswith("image/"):
@@ -29,7 +33,11 @@ async def analyze_fridge_image(file: UploadFile = File(...)):
         
         try:
             # 오케스트레이터 실행
-            result = await run_orchestrator(image_path=tmp_file_path)
+            result = await run_orchestrator(
+                image_path=tmp_file_path,
+                servings=servings,
+                diet_type=diet_type
+            )
             
             return JSONResponse(content=result)
             

@@ -42,8 +42,8 @@ export default function SplineScene() {
     }
   }
 
-  const onError = (error: Error) => {
-    console.error('Spline loading error:', error)
+  const onError = (e: any) => {
+    console.error('Spline loading error:', e)
     setIsLoading(false)
     setHasError(true)
   }
