@@ -12,17 +12,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Install HEADLESS OpenCV first to avoid pulling X11 deps
+# 1. Install HEADLESS OpenCV first
 RUN pip install --no-cache-dir opencv-python-headless
 
-# Install CPU-only PyTorch and Ultralytics together from the CPU index
-# This ensures that when ultralytics asks for torch, it gets the CPU version
-RUN pip install --no-cache-dir torch torchvision ultralytics --index-url https://download.pytorch.org/whl/cpu
+# 2. Install CPU-only PyTorch FIRST from the PyTorch-specific index
+# This ensures we get the lightweight version (approx 100MB instead of 1GB+)
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
-# Copy requirements file
+# 3. Install Ultralytics explicitly from STANDARD PyPI
+# Since torch is already installed above, it should verify the version and skip re-downloading
+RUN pip install --no-cache-dir ultralytics
+
+# Copy requirements file (which no longer has ultralytics)
 COPY requirements.txt .
 
-# Install remaining dependencies
+# 4. Install remaining dependencies
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
