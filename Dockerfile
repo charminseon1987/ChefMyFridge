@@ -6,9 +6,8 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
-# libgl1-mesa-glx: Required for OpenCV
-# libglib2.0-0: Required for OpenCV
-RUN apt-get update && apt-get install -y \
+# libgl1-mesa-glx replaced to avoid "Package not available" error on newer Debian
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     build-essential \
