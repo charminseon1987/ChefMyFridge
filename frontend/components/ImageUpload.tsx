@@ -74,8 +74,9 @@ export default function ImageUpload({
     formData.append('diet_type', dietType)
 
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
       const response = await axios.post(
-        'http://127.0.0.1:8000/api/v1/analyze',
+        `${apiUrl}/api/v1/analyze`,
         formData,
         {
           headers: {

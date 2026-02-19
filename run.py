@@ -27,10 +27,14 @@ if __name__ == "__main__":
                 continue
         return start_port  # 기본값 반환
     
-    port = find_free_port(8000)
+    # 포트 설정 (Railway 등 클라우드 환경 지원)
+    port = int(os.getenv("PORT", 8000))
     
-    if port != 8000:
-        print(f"⚠️  포트 8000이 사용 중입니다. 포트 {port}를 사용합니다.")
+    # 로컬 개발 환경에서만 가용 포트 검색 (PORT가 설정되지 않았을 때)
+    if not os.getenv("PORT"):
+        port = find_free_port(8000)
+        if port != 8000:
+            print(f"⚠️  포트 8000이 사용 중입니다. 포트 {port}를 사용합니다.")
     
     uvicorn.run(
         "src.api.main:app",
