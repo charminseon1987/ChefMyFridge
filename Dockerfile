@@ -1,12 +1,12 @@
 
-# Use Python 3.11 slim image for smaller size
-FROM python:3.11-slim
+# Use specific stable Debian Bookworm image to avoid "Trixie" (testing) instability
+FROM python:3.11-slim-bookworm
 
 # Set working directory
 WORKDIR /app
 
 # Install system dependencies
-# libgl1-mesa-glx replaced to avoid "Package not available" error on newer Debian
+# libgl1 is the correct package for Debian Bookworm+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
@@ -17,7 +17,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 # Install Python dependencies
-# --no-cache-dir reduces image size
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
