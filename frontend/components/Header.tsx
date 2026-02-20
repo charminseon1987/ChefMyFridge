@@ -1,11 +1,23 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, useScroll, useMotionValueEvent } from 'framer-motion'
 import { Refrigerator, Sparkles } from 'lucide-react'
+import { useState } from 'react'
 
 export default function Header() {
+  const { scrollY } = useScroll()
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    setIsScrolled(latest > 10)
+  })
+
   return (
-    <header className="w-full py-6 px-4 glass-emerald border-b border-slate-200/50 shadow-3d-emerald">
+    <header className={`sticky top-0 z-50 w-full py-4 px-4 transition-all duration-300 ${
+      isScrolled 
+        ? 'bg-white/80 backdrop-blur-md border-b border-slate-200/50 shadow-sm' 
+        : 'glass-emerald border-b border-slate-200/50 shadow-3d-emerald'
+    }`}>
       <div className="container mx-auto flex items-center justify-between">
         <motion.div
           initial={{ opacity: 0, x: -20 }}

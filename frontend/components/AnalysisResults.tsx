@@ -65,7 +65,6 @@ export default function AnalysisResults({ data }: AnalysisResultsProps) {
       // API 응답을 RecipeCard 형식에 맞게 변환
       const recipes = response.data.recipes.map((recipe: any) => {
         const recipeTitle = recipe.title
-        // API 응답에서 받은 유튜브 영상 데이터에서 해당 레시피의 영상 찾기
         const videos = apiYoutubeVideos[recipeTitle] || []
         
         return {
@@ -77,7 +76,8 @@ export default function AnalysisResults({ data }: AnalysisResultsProps) {
           ingredients: recipe.ingredients || [],
           calories: recipe.calories,
           image: recipe.image,
-          recommendedVideos: videos.length > 0 ? videos : undefined, // 유튜브 영상이 있으면 추가
+          recommendedVideos: videos.length > 0 ? videos : undefined,
+          match_rate: recipe.match_rate,
         }
       })
       
@@ -407,7 +407,6 @@ export default function AnalysisResults({ data }: AnalysisResultsProps) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {recipeSuggestions.map((recipe: any, index: number) => {
-              // 백엔드에서 받은 유튜브 영상 데이터 연결
               const recipeTitle = recipe.title
               const videos = youtubeVideos[recipeTitle] || []
               const recipeWithVideos = {
@@ -419,6 +418,7 @@ export default function AnalysisResults({ data }: AnalysisResultsProps) {
                 ingredients: recipe.ingredients_needed || [],
                 calories: recipe.calories,
                 recommendedVideos: videos.length > 0 ? videos : undefined,
+                match_rate: recipe.match_rate,
               }
               return (
                 <RecipeCard key={index} recipe={recipeWithVideos} index={index} />

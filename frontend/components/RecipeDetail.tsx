@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
-import { X, Clock, ChefHat, Utensils, Youtube, ShoppingCart, CheckCircle2 } from 'lucide-react'
+import { X, Clock, ChefHat, Utensils, Youtube, ShoppingCart, CheckCircle2, Percent } from 'lucide-react'
 
 export interface Ingredient {
   name: string
@@ -25,16 +25,24 @@ export interface SauceRecipe {
   tip?: string
 }
 
+export interface NutritionalInfo {
+  calories: number
+  protein?: string
+  carbs?: string
+  fat?: string
+}
+
 export interface Recipe {
   id: string
   title: string
   description: string
   cookingTime: string
   difficulty: '초' | '중' | '고'
-  ingredients: string[] | Ingredient[] // 기존 형식 또는 상세 형식
+  servings?: string
+  ingredients: string[] | Ingredient[]
   calories?: number
   image?: string
-  steps?: string[] | RecipeStep[] // 기존 형식 또는 상세 형식
+  steps?: string[] | RecipeStep[]
   youtubeId?: string
   recommendedVideos?: Array<{
     id: string
@@ -42,9 +50,14 @@ export interface Recipe {
     channel: string
     thumbnailUrl?: string
   }>
-  sauces?: SauceRecipe[] // 양념/소스 비법
-  tips?: string[] // 전체적인 팁들
-  missing_ingredients?: string[] // 부족한 재료 (쇼핑 리스트)
+  sauce?: SauceRecipe
+  sauces?: SauceRecipe[]
+  tips?: string[]
+  missing_ingredients?: string[]
+  match_rate?: number
+  nutritional_info?: NutritionalInfo
+  storage?: string
+  pairing?: string[]
 }
 
 interface RecipeDetailProps {
@@ -264,7 +277,7 @@ export default function RecipeDetail({ recipe, onClose }: RecipeDetailProps) {
 
           <div className="p-6 space-y-6">
             {/* 기본 정보 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="flex items-center space-x-3 p-4 bg-slate-50 rounded-lg">
                 <Clock className="w-5 h-5 text-slate-600" />
                 <div>
@@ -290,7 +303,73 @@ export default function RecipeDetail({ recipe, onClose }: RecipeDetailProps) {
                   </div>
                 </div>
               )}
+              {recipe.match_rate !== undefined && (
+                <div className="flex items-center space-x-3 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                  <Percent className="w-5 h-5 text-emerald-600" />
+                  <div>
+                    <p className="text-xs text-emerald-600">매칭률</p>
+                    <p className="font-bold text-emerald-700">{recipe.match_rate}%</p>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* 상세 영양 정보 (AI 레시피용) */}
+            {recipe.nutritional_info && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-4 border border-orange-200">
+                  <p className="text-xs text-orange-600 mb-1">열량</p>
+                  <p className="text-lg font-bold text-orange-700">{recipe.nutritional_info.calories}kcal</p>
+                </div>
+                {recipe.nutritional_info.protein && (
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200">
+                    <p className="text-xs text-blue-600 mb-1">단백질</p>
+                    <p className="text-lg font-bold text-blue-700">{recipe.nutritional_info.protein}</p>
+                  </div>
+                )}
+                {recipe.nutritional_info.carbs && (
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                    <p className="text-xs text-green-600 mb-1">탄수화물</p>
+                    <p className="text-lg font-bold text-green-700">{recipe.nutritional_info.carbs}</p>
+                  </div>
+                )}
+                {recipe.nutritional_info.fat && (
+                  <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-lg p-4 border border-yellow-200">
+                    <p className="text-xs text-yellow-600 mb-1">지방</p>
+                    <p className="text-lg font-bold text-yellow-700">{recipe.nutritional_info.fat}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 보관 방법 및 페어링 */}
+            {(recipe.storage || recipe.pairing) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {recipe.storage && (
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <h4 className="font-semibold text-blue-800 mb-2 flex items-center">
+                      <span className="mr-2">📦</span> 보관 방법
+                    </h4>
+                    <p className="text-sm text-blue-700">{recipe.storage}</p>
+                  </div>
+                )}
+                {recipe.pairing && recipe.pairing.length > 0 && (
+                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                    <h4 className="font-semibold text-purple-800 mb-2 flex items-center">
+                      <span className="mr-2">🍽️</span> 추천 페어링
+                    </h4>
+                    <ul className="text-sm text-purple-700 space-y-1">
+                      {recipe.pairing.map((item, idx) => (
+                        <li key={idx} className="flex items-center">
+                          <span className="w-1.5 h-1.5 bg-purple-400 rounded-full mr-2"></span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 쇼핑 리스트 (부족한 재료) */}
             {recipe.missing_ingredients && recipe.missing_ingredients.length > 0 && (

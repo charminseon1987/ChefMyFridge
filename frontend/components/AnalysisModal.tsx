@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   X, ChevronRight, ChevronLeft, Check, 
   Calendar, ShoppingBag, ChefHat, FileText,
-  Loader2, RefreshCw
+  Loader2, RefreshCw, MessageCircle, Sparkles, Play,
+  Trash2, Pencil, CheckCircle, XCircle
 } from 'lucide-react'
 import axios from 'axios'
 import ReactMarkdown from 'react-markdown'
@@ -26,6 +27,14 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
   const [report, setReport] = useState<string | null>(null)
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
 
+  // AI Recommend States
+  const [userAnswer, setUserAnswer] = useState('')
+  const [aiRecipes, setAiRecipes] = useState<any[]>([])
+  const [aiYoutubeVideos, setAiYoutubeVideos] = useState<Record<string, any[]>>({})
+  const [isLoadingAI, setIsLoadingAI] = useState(false)
+  const [selectedDietType, setSelectedDietType] = useState<string>('')
+  const [errorMessage, setErrorMessage] = useState<string>('')
+
   // Manual Annotation State
   const [isDrawing, setIsDrawing] = useState(false)
   const [startPos, setStartPos] = useState<{x: number, y: number} | null>(null)
@@ -33,12 +42,20 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
   const [showAddForm, setShowAddForm] = useState(false)
   const [newItem, setNewItem] = useState({ name: '', purchaseDate: '', expiryDate: '' })
 
+  const [draggingItemIdx, setDraggingItemIdx] = useState<number | null>(null)
+  const [dragStartPos, setDragStartPos] = useState<{x: number, y: number} | null>(null)
+  const [originalBbox, setOriginalBbox] = useState<number[] | null>(null)
+  const [resizingItemIdx, setResizingItemIdx] = useState<number | null>(null)
+  const [resizeStartPos, setResizeStartPos] = useState<{x: number, y: number} | null>(null)
+  const [resizeStartBbox, setResizeStartBbox] = useState<number[] | null>(null)
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editingName, setEditingName] = useState('')
+  
+  const imageContainerRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
     if (data && isOpen) {
-      // AI 감지 항목에 type: 'ai' 추가
       const detected = (data.detected_items || []).map((item: any) => ({ ...item, type: 'ai' }))
-
-      // 디버그: 받은 데이터 확인
       console.log('🔍 AnalysisModal - 받은 전체 데이터:', data)
       console.log('🔍 AnalysisModal - detected_items 개수:', detected.length)
       detected.forEach((item: any, idx: number) => {
@@ -49,11 +66,118 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
 
       setItems(detected)
       setRecipes(data.recipe_suggestions || [])
+      setUserAnswer('')
+      setAiRecipes([])
+      setAiYoutubeVideos({})
+      setSelectedDietType('')
+      setErrorMessage('')
       setStep(1)
+      
+      setDraggingItemIdx(null)
+      setDragStartPos(null)
+      setOriginalBbox(null)
+      setResizingItemIdx(null)
+      setResizeStartPos(null)
+      setResizeStartBbox(null)
+      setEditingIdx(null)
+      setIsDrawing(false)
     }
   }, [data, isOpen])
 
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (draggingItemIdx === null || !dragStartPos || !originalBbox || !imageContainerRef.current) return
+      
+      const rect = imageContainerRef.current.getBoundingClientRect()
+      const currentX = (e.clientX - rect.left) / rect.width * 1000
+      const currentY = (e.clientY - rect.top) / rect.height * 1000
+      
+      const dx = currentX - dragStartPos.x
+      const dy = currentY - dragStartPos.y
+      
+      const boxHeight = originalBbox[2] - originalBbox[0]
+      const boxWidth = originalBbox[3] - originalBbox[1]
+      
+      const newBbox = [
+        Math.max(0, Math.min(1000 - boxHeight, originalBbox[0] + dy)),
+        Math.max(0, Math.min(1000 - boxWidth, originalBbox[1] + dx)),
+        Math.max(0, Math.min(1000, originalBbox[0] + boxHeight + dy)),
+        Math.max(0, Math.min(1000, originalBbox[1] + boxWidth + dx)),
+      ]
+      
+      setItems(prev => {
+        const newItems = [...prev]
+        newItems[draggingItemIdx] = { ...newItems[draggingItemIdx], bbox_2d: newBbox }
+        return newItems
+      })
+    }
+
+    const handleGlobalMouseUp = () => {
+      if (draggingItemIdx !== null) {
+        setDraggingItemIdx(null)
+        setDragStartPos(null)
+        setOriginalBbox(null)
+      }
+    }
+
+    if (draggingItemIdx !== null) {
+      document.addEventListener('mousemove', handleGlobalMouseMove)
+      document.addEventListener('mouseup', handleGlobalMouseUp)
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove)
+      document.removeEventListener('mouseup', handleGlobalMouseUp)
+    }
+  }, [draggingItemIdx, dragStartPos, originalBbox])
+
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent) => {
+      if (resizingItemIdx === null || !resizeStartPos || !resizeStartBbox || !imageContainerRef.current) return
+      
+      const rect = imageContainerRef.current.getBoundingClientRect()
+      const currentX = (e.clientX - rect.left) / rect.width * 1000
+      const currentY = (e.clientY - rect.top) / rect.height * 1000
+      
+      const dx = currentX - resizeStartPos.x
+      const dy = currentY - resizeStartPos.y
+      
+      const newBbox = [
+        resizeStartBbox[0],
+        resizeStartBbox[1],
+        Math.max(resizeStartBbox[0] + 30, Math.min(1000, resizeStartBbox[2] + dy)),
+        Math.max(resizeStartBbox[1] + 30, Math.min(1000, resizeStartBbox[3] + dx)),
+      ]
+      
+      setItems(prev => {
+        const newItems = [...prev]
+        newItems[resizingItemIdx] = { ...newItems[resizingItemIdx], bbox_2d: newBbox }
+        return newItems
+      })
+    }
+
+    const handleResizeUp = () => {
+      if (resizingItemIdx !== null) {
+        setResizingItemIdx(null)
+        setResizeStartPos(null)
+        setResizeStartBbox(null)
+      }
+    }
+
+    if (resizingItemIdx !== null) {
+      document.addEventListener('mousemove', handleResizeMove)
+      document.addEventListener('mouseup', handleResizeUp)
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove)
+      document.removeEventListener('mouseup', handleResizeUp)
+    }
+  }, [resizingItemIdx, resizeStartPos, resizeStartBbox])
+
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (draggingItemIdx !== null) return
+      
       // 이미지 컨테이너 기준 상대 좌표 계산
       const rect = e.currentTarget.getBoundingClientRect()
       const x = (e.clientX - rect.left) / rect.width * 1000
@@ -62,7 +186,42 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
       setIsDrawing(true)
   }
 
+  const handleItemMouseDown = (e: React.MouseEvent<HTMLDivElement>, idx: number, bbox: number[]) => {
+      e.stopPropagation()
+      e.preventDefault()
+      
+      if (!imageContainerRef.current) return
+      const rect = imageContainerRef.current.getBoundingClientRect()
+      const x = (e.clientX - rect.left) / rect.width * 1000
+      const y = (e.clientY - rect.top) / rect.height * 1000
+      
+      setDragStartPos({ x, y })
+      setDraggingItemIdx(idx)
+      setOriginalBbox(bbox)
+  }
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (draggingItemIdx !== null && dragStartPos && originalBbox) {
+          const rect = e.currentTarget.getBoundingClientRect()
+          const currentX = (e.clientX - rect.left) / rect.width * 1000
+          const currentY = (e.clientY - rect.top) / rect.height * 1000
+          
+          const dx = currentX - dragStartPos.x
+          const dy = currentY - dragStartPos.y
+          
+          const newBbox = [
+              Math.max(0, Math.min(1000 - (originalBbox[2] - originalBbox[0]), originalBbox[0] + dy)),
+              Math.max(0, Math.min(1000 - (originalBbox[3] - originalBbox[1]), originalBbox[1] + dx)),
+              Math.max(0, Math.min(1000, originalBbox[2] + dy)),
+              Math.max(0, Math.min(1000, originalBbox[3] + dx)),
+          ]
+          
+          const newItems = [...items]
+          newItems[draggingItemIdx] = { ...newItems[draggingItemIdx], bbox_2d: newBbox }
+          setItems(newItems)
+          return
+      }
+      
       if (!isDrawing || !startPos) return
       
       const rect = e.currentTarget.getBoundingClientRect()
@@ -78,6 +237,13 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
   }
 
   const handleMouseUp = () => {
+      if (draggingItemIdx !== null) {
+          setDraggingItemIdx(null)
+          setDragStartPos(null)
+          setOriginalBbox(null)
+          return
+      }
+      
       if (isDrawing && currentBox) {
           // 너무 작은 박스는 무시 (가로세로 20이하)
           if ((currentBox[2] - currentBox[0]) > 20 && (currentBox[3] - currentBox[1]) > 20) {
@@ -103,13 +269,49 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
           bbox_2d: currentBox || null,
           purchase_date: newItem.purchaseDate,
           expiry_date: newItem.expiryDate,
-          type: 'manual' // 수동 추가 항목 표시
+          type: 'manual'
       }
       
       setItems([...items, newItemData])
       setShowAddForm(false)
       setNewItem({ name: '', purchaseDate: '', expiryDate: '' })
       setCurrentBox(null)
+  }
+
+  const handleResizeStart = (e: React.MouseEvent, idx: number, bbox: number[]) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (!imageContainerRef.current) return
+    const rect = imageContainerRef.current.getBoundingClientRect()
+    const x = (e.clientX - rect.left) / rect.width * 1000
+    const y = (e.clientY - rect.top) / rect.height * 1000
+    setResizeStartPos({ x, y })
+    setResizingItemIdx(idx)
+    setResizeStartBbox(bbox)
+  }
+
+  const handleDeleteItem = (idx: number) => {
+    const newItems = items.filter((_, i) => i !== idx)
+    setItems(newItems)
+  }
+
+  const handleStartEdit = (idx: number, name: string) => {
+    setEditingIdx(idx)
+    setEditingName(name)
+  }
+
+  const handleSaveEdit = (idx: number) => {
+    if (!editingName.trim()) return
+    const newItems = [...items]
+    newItems[idx] = { ...newItems[idx], name: editingName.trim() }
+    setItems(newItems)
+    setEditingIdx(null)
+    setEditingName('')
+  }
+
+  const handleCancelEdit = () => {
+    setEditingIdx(null)
+    setEditingName('')
   }
 
   // Helper to split items
@@ -148,62 +350,78 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
       </h2>
       
       {/* ... (Image Container Code remains mostly same, just checking map key/indices) ... */}
-      <div className="w-full bg-slate-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center relative select-none" style={{ minHeight: '300px' }}>
+      <div className="w-full bg-slate-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center relative select-none" style={{ minHeight: '300px' }} ref={imageContainerRef}>
         {imageData && (
           <div className="relative inline-block">
-             <div 
-                className="absolute inset-0 z-20 cursor-crosshair"
+              <div 
+                className="absolute inset-0 z-10"
+                style={{ 
+                  cursor: draggingItemIdx !== null ? 'default' : 'crosshair',
+                  pointerEvents: draggingItemIdx !== null ? 'none' : 'auto'
+                }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
-                onMouseLeave={() => { if(isDrawing) { setIsDrawing(false); setStartPos(null); setCurrentBox(null); } }}
+                onMouseLeave={() => { 
+                    if(isDrawing) { setIsDrawing(false); setStartPos(null); setCurrentBox(null); }
+                    if(draggingItemIdx !== null) { setDraggingItemIdx(null); setDragStartPos(null); setOriginalBbox(null); }
+                }}
              ></div>
 
              <img src={imageData} alt="Fridge" className="block max-w-full max-h-[50vh] w-auto h-auto object-contain pointer-events-none" />
              
-             {/* Render AI Items Boxes */}
-             {aiItems.map((item, idx) => {
-                // bbox_2d 유효성 검사
-                const hasBbox = item.bbox_2d &&
-                               Array.isArray(item.bbox_2d) &&
-                               item.bbox_2d.length === 4 &&
-                               item.bbox_2d.every((v: number) => typeof v === 'number')
+              {/* Render AI Items Boxes */}
+              {aiItems.map((item, idx) => {
+                 const hasBbox = item.bbox_2d &&
+                                Array.isArray(item.bbox_2d) &&
+                                item.bbox_2d.length === 4 &&
+                                item.bbox_2d.every((v: number) => typeof v === 'number')
 
-                if (!hasBbox) {
-                  console.warn(`⚠️ AI 항목 "${item.name}"에 유효한 bbox_2d가 없습니다:`, item.bbox_2d)
-                  return null
-                }
+                 if (!hasBbox) {
+                   console.warn(`⚠️ AI 항목 "${item.name}"에 유효한 bbox_2d가 없습니다:`, item.bbox_2d)
+                   return null
+                 }
 
-                // YOLO 정확 매칭 → 실선/진한 파란색, GPT 추정 → 점선/연한 파란색
-                const isYoloAccurate = item.yolo_matched === true
-                const boxClassName = isYoloAccurate
-                  ? "absolute border-2 border-blue-600 bg-blue-600/20 flex items-center justify-center pointer-events-none"
-                  : "absolute border-2 border-dashed border-blue-400 bg-blue-400/10 flex items-center justify-center pointer-events-none"
-                const labelClassName = isYoloAccurate
-                  ? "bg-blue-600 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10"
-                  : "bg-blue-400 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10"
+                 const isYoloAccurate = item.yolo_matched === true
+                 const isDragging = draggingItemIdx === idx
+                 const isResizing = resizingItemIdx === idx
+                 const boxClassName = isYoloAccurate
+                   ? `absolute border-2 border-blue-600 bg-blue-600/20 flex items-center justify-center ${isDragging ? 'cursor-grabbing shadow-lg' : 'cursor-grab'} ${isResizing ? 'ring-2 ring-blue-300' : ''}`
+                   : `absolute border-2 border-dashed border-blue-400 bg-blue-400/10 flex items-center justify-center ${isDragging ? 'cursor-grabbing shadow-lg' : 'cursor-grab'} ${isResizing ? 'ring-2 ring-blue-300' : ''}`
+                 const labelClassName = isYoloAccurate
+                   ? "bg-blue-600 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-50"
+                   : "bg-blue-400 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-50"
 
-                return (
-                  <div
-                    key={`ai-${idx}`}
-                    className={boxClassName}
+                 return (
+                   <div
+                     key={`ai-${idx}`}
+                     className={boxClassName}
+                     onMouseDown={(e) => handleItemMouseDown(e, idx, item.bbox_2d)}
                     style={{
                       top: `${item.bbox_2d[0] / 10}%`,
                       left: `${item.bbox_2d[1] / 10}%`,
                       height: `${(item.bbox_2d[2] - item.bbox_2d[0]) / 10}%`,
                       width: `${(item.bbox_2d[3] - item.bbox_2d[1]) / 10}%`,
+                      zIndex: 40,
                     }}
                   >
                     <span className={labelClassName}>
                       {idx + 1}. {item.name}
                     </span>
+                    <div 
+                      className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize"
+                      onMouseDown={(e) => handleResizeStart(e, idx, item.bbox_2d)}
+                    >
+                      <svg viewBox="0 0 24 24" className="w-3 h-3 text-blue-600 opacity-70">
+                        <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22Z" fill="currentColor"/>
+                      </svg>
+                    </div>
                   </div>
                 )
              })}
 
              {/* Render Manual Items Boxes (Green) */}
              {manualItems.map((item, idx) => {
-                // bbox_2d 유효성 검사
                 const hasBbox = item.bbox_2d &&
                                Array.isArray(item.bbox_2d) &&
                                item.bbox_2d.length === 4 &&
@@ -217,22 +435,31 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                 return (
                   <div
                     key={`manual-${idx}`}
-                    className="absolute border-2 border-green-600 bg-green-600/20 flex items-center justify-center pointer-events-none"
+                    className="absolute border-2 border-green-600 bg-green-600/20 flex items-center justify-center cursor-grab"
                     style={{
                       top: `${item.bbox_2d[0] / 10}%`,
                       left: `${item.bbox_2d[1] / 10}%`,
                       height: `${(item.bbox_2d[2] - item.bbox_2d[0]) / 10}%`,
                       width: `${(item.bbox_2d[3] - item.bbox_2d[1]) / 10}%`,
+                      zIndex: 40,
                     }}
-                  >
-                    <span className="bg-green-600 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10">
-                      {idx + 1}. {item.name}
-                    </span>
-                  </div>
-                )
-             })}
+                    >
+                      <span className="bg-green-600 text-white text-xs px-1 rounded absolute -top-5 left-0 whitespace-nowrap z-10">
+                        {idx + 1}. {item.name}
+                      </span>
+                      <div 
+                        className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize"
+                        onMouseDown={(e) => handleResizeStart(e, aiItems.length + idx, item.bbox_2d)}
+                      >
+                        <svg viewBox="0 0 24 24" className="w-3 h-3 text-green-600 opacity-70">
+                          <path d="M22 22H20V20H22V22ZM22 18H20V16H22V18ZM18 22H16V20H18V22ZM22 14H20V12H22V14ZM18 18H16V16H18V18ZM14 22H12V20H14V22Z" fill="currentColor"/>
+                        </svg>
+                      </div>
+                    </div>
+                  )
+               })}
 
-             {currentBox && (
+              {currentBox && (
                  <div
                     className="absolute border-2 border-green-500 bg-green-500/30 pointer-events-none z-30"
                     style={{
@@ -248,7 +475,7 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
         
       </div>
       
-      <div className="flex-1 overflow-y-auto pr-2">
+      <div className="flex-1 overflow-y-auto pr-2 max-h-[60vh]">
         {/* Group 1: AI Detected */}
         <div className="mb-6">
             <h3 className="font-bold text-lg mb-3 text-black border-b border-slate-200 pb-2">
@@ -257,27 +484,54 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
             <ul className="space-y-2">
                 {aiItems.map((item, idx) => {
                     const maxDays = expiryMap[item.name]
+                    const isEditing = editingIdx === idx
                     return (
                     <li key={`ai-list-${idx}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 shadow-sm">
-                        <span className="flex items-center">
-                            <span className="bg-blue-100 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs mr-3 font-bold border border-blue-200">
-                                {idx + 1}
-                            </span>
-                            <span className="font-medium text-black">{item.name}</span>
-                            {!item.yolo_matched && (
-                                <span className="ml-2 text-xs text-blue-400 border border-blue-200 rounded px-1">추정</span>
-                            )}
-                        </span>
-                        <span className="flex items-center gap-2">
-                            {maxDays != null && (
-                                <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">
-                                    최대 보관 {maxDays}일
+                        {isEditing ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <input 
+                              type="text" 
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              className="flex-1 border rounded px-2 py-1 text-sm"
+                              autoFocus
+                            />
+                            <button onClick={() => handleSaveEdit(idx)} className="p-1 text-green-600 hover:bg-green-100 rounded">
+                              <CheckCircle className="w-5 h-5" />
+                            </button>
+                            <button onClick={handleCancelEdit} className="p-1 text-red-600 hover:bg-red-100 rounded">
+                              <XCircle className="w-5 h-5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="flex items-center flex-1">
+                                <span className="bg-blue-100 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs mr-3 font-bold border border-blue-200">
+                                    {idx + 1}
                                 </span>
-                            )}
-                            <span className="text-sm text-slate-500 font-medium">
-                                {(item.confidence * 100).toFixed(0)}%
+                                <span className="font-medium text-black">{item.name}</span>
+                                {!item.yolo_matched && (
+                                    <span className="ml-2 text-xs text-blue-400 border border-blue-200 rounded px-1">추정</span>
+                                )}
                             </span>
-                        </span>
+                            <span className="flex items-center gap-2">
+                                {maxDays != null && (
+                                    <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-0.5">
+                                        최대 보관 {maxDays}일
+                                    </span>
+                                )}
+                                <span className="text-sm text-slate-500 font-medium">
+                                    {(item.confidence * 100).toFixed(0)}%
+                                </span>
+                                <button onClick={() => handleStartEdit(idx, item.name)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleDeleteItem(idx)} className="p-1 text-red-600 hover:bg-red-100 rounded">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                            </span>
+                          </>
+                        )}
                     </li>
                     )
                 })}
@@ -297,15 +551,23 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                 <ul className="space-y-2">
                     {manualItems.map((item, idx) => (
                         <li key={`manual-list-${idx}`} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200 shadow-sm">
-                            <span className="flex items-center">
+                            <span className="flex items-center flex-1">
                                 <span className="bg-green-100 text-black w-6 h-6 rounded-full flex items-center justify-center text-xs mr-3 font-bold border border-green-200">
                                     {idx + 1}
                                 </span>
                                 <span className="font-medium text-black">{item.name}</span>
                             </span>
-                            <span className="text-sm text-green-600 font-bold">
-                                직접 추가됨
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-green-600 font-bold">
+                                    직접 추가됨
+                                </span>
+                                <button onClick={() => handleStartEdit(aiItems.length + idx, item.name)} className="p-1 text-blue-600 hover:bg-blue-100 rounded">
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleDeleteItem(aiItems.length + idx)} className="p-1 text-red-600 hover:bg-red-100 rounded">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         </li>
                     ))}
                 </ul>
@@ -427,14 +689,14 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
       </div>
 
       <div className="mt-4 flex justify-between">
-         <button onClick={() => setStep(1)} className="text-slate-500 px-4 py-2 hover:bg-slate-100 rounded">
-            이전
-         </button>
+          <button onClick={() => setStep(1)} className="text-slate-500 px-4 py-2 hover:bg-slate-100 rounded">
+             이전
+          </button>
         <button
           onClick={() => setStep(3)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center"
         >
-          다음: 레시피 보기 <ChevronRight className="w-4 h-4 ml-1" />
+          다음: 식단 선택 <ChevronRight className="w-4 h-4 ml-1" />
         </button>
       </div>
     </div>
@@ -445,7 +707,7 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
   const handleRecipeSelect = async (recipe: any) => {
       setSelectedRecipe(recipe)
       setIsGeneratingReport(true)
-      setStep(4)
+      setStep(5)
       
       try {
           const ingredientNames = items.map(i => i.name)
@@ -462,59 +724,230 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
       }
   }
 
-  const renderRecipeStep = () => (
+  // AI 추천 요청
+  const handleAIRecommend = async () => {
+    if (!userAnswer.trim()) return
+    
+    setErrorMessage('')
+    setIsLoadingAI(true)
+    try {
+      const detectedItemsForAPI = items.map(i => ({ name: i.name }))
+      const res = await axios.post('http://localhost:8000/api/v1/recipes/ai-recommend', {
+        user_answer: userAnswer,
+        detected_items: detectedItemsForAPI
+      })
+      
+      setAiRecipes(res.data.recipes || [])
+      setAiYoutubeVideos(res.data.youtube_videos || {})
+      setSelectedDietType(res.data.diet_type || 'general')
+      setStep(4)
+    } catch (e: any) {
+      console.error('AI 추천 오류:', e)
+      const msg = e.response?.data?.detail || '서버 연결에 실패했습니다. 백엔드가 실행 중인지 확인해주세요.'
+      setErrorMessage(msg)
+    } finally {
+      setIsLoadingAI(false)
+    }
+  }
+
+  // 빠른 선택 버튼들
+  const quickAnswers = [
+    '다이어트 식단이야',
+    '건강하게 먹고 싶어',
+    '환자식 먹어야 해',
+    '일반식으로 해줘'
+  ]
+
+  // Step 3: 식단 유형 선택
+  const renderDietSelectStep = () => (
     <div className="flex flex-col h-full">
       <h2 className="text-2xl font-bold mb-4 flex items-center text-black">
-        <ChefHat className="w-6 h-6 mr-2 text-amber-600" />
-        추천 레시피 (Top 3)
+        <MessageCircle className="w-6 h-6 mr-2 text-violet-600" />
+        오늘은 어떤 식사를 하고 싶어요?
       </h2>
-      <p className="text-slate-600 mb-4">만들고 싶은 요리를 선택하면 상세 보고서를 작성합니다.</p>
+      <p className="text-slate-600 mb-6">
+        하고 싶은 식사 유형을 입력하거나 아래 버튼을 선택해주세요.<br/>
+        AI가 상황에 맞는 레시피 20가지를 추천해줍니다!
+      </p>
       
-      {data?.discussion_result?.discussion && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-            <h3 className="font-bold text-amber-800 flex items-center mb-2">
-                <ChefHat className="w-5 h-5 mr-2" /> 셰프들의 논의
-            </h3>
-            <p className="text-sm text-amber-900 whitespace-pre-wrap">
-                {data.discussion_result.discussion}
-            </p>
+      <div className="flex-1 overflow-y-auto">
+        <div className="mb-6">
+          <label className="block text-sm font-bold text-slate-700 mb-2">
+            하고 싶은 식사 (예: 다이어트 식단, 건강식, 환식 등)
+          </label>
+          <textarea
+            value={userAnswer}
+            onChange={(e) => setUserAnswer(e.target.value)}
+            placeholder="오늘은 다이어트 식단을 하고 싶어..."
+            className="w-full border border-slate-300 rounded-lg p-4 text-black h-24 resize-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+          />
         </div>
-      )}
 
-      <div className="flex-1 overflow-y-auto grid grid-cols-1 gap-4 p-1">
-        {recipes.slice(0, 3).map((recipe, idx) => (
-             <motion.div 
+        <div className="mb-6">
+          <p className="text-sm font-medium text-slate-600 mb-3">빠른 선택:</p>
+          <div className="grid grid-cols-2 gap-3">
+            {quickAnswers.map((answer, idx) => (
+              <button
                 key={idx}
-                whileHover={{ scale: 1.02 }}
-                onClick={() => handleRecipeSelect(recipe)}
-                className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:shadow-md hover:border-amber-300 transition-all"
-             >
-                <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-xl font-bold text-slate-800">{recipe.title}</h3>
-                    <span className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full">{recipe.difficulty} / {recipe.cooking_time}</span>
-                </div>
-                <p className="text-sm text-slate-600 mb-3">{recipe.description}</p>
-                <div className="flex justify-between items-center text-sm">
-                    <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100">
-                        매칭률 {Math.round(recipe.match_rate * 100)}%
-                    </span>
-                    <span className="font-semibold text-amber-600 flex items-center">
-                        리포트 생성 <ChevronRight className="w-4 h-4" />
-                    </span>
-                </div>
-             </motion.div>
-        ))}
+                onClick={() => setUserAnswer(answer)}
+                className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                  userAnswer === answer
+                    ? 'border-violet-500 bg-violet-50 text-violet-700'
+                    : 'border-slate-200 hover:border-violet-300 text-slate-600'
+                }`}
+              >
+                {answer}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-4 border border-violet-200">
+          <div className="flex items-center gap-2 text-violet-700 mb-2">
+            <Sparkles className="w-5 h-5" />
+            <span className="font-bold">AI가 추천해줍니다</span>
+          </div>
+          <p className="text-sm text-violet-600">
+            입력하신 내용에 따라 최적의 레시피 20가지를 추천하고,<br/>
+            각 레시피에 맞는 유튜브 영상도 함께 제공해드립니다!
+          </p>
+        </div>
       </div>
-      
-       <div className="mt-4 flex justify-start">
-         <button onClick={() => setStep(2)} className="text-slate-500 px-4 py-2 hover:bg-slate-100 rounded">
-            이전
-         </button>
+
+      <div className="mt-4 flex justify-between">
+        <button onClick={() => setStep(2)} className="text-slate-500 px-4 py-2 hover:bg-slate-100 rounded">
+           이전
+        </button>
+        <button
+          onClick={handleAIRecommend}
+          disabled={!userAnswer.trim() || isLoadingAI}
+          className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white px-6 py-2 rounded-lg flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLoadingAI ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              AI가 레시피 찾는 중...
+            </>
+          ) : (
+            <>
+              AI 추천 받기 <Sparkles className="w-4 h-4 ml-1" />
+            </>
+          )}
+        </button>
+
+        {errorMessage && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm font-medium">
+              {errorMessage}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
 
-  // --- Step 4: Report View (Infographic) ---
+  // Step 4: AI 추천 레시피 (20개)
+  const renderAIRecipeStep = () => (
+    <div className="flex flex-col h-full">
+      <div className="mb-4">
+        <h2 className="text-2xl font-bold flex items-center text-black">
+          <ChefHat className="w-6 h-6 mr-2 text-amber-600" />
+          AI 추천 레시피 (20가지)
+        </h2>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="bg-violet-100 text-violet-700 text-sm px-3 py-1 rounded-full font-medium">
+            선택한 식단: {selectedDietType === 'diet' ? '다이어트' : selectedDietType === 'health' ? '건강식' : selectedDietType === 'patient' ? '환자식' : '일반'}
+          </span>
+          <span className="text-slate-500 text-sm">
+            "{userAnswer}" 기반 추천
+          </span>
+        </div>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto">
+        {aiRecipes.length === 0 ? (
+          <div className="text-center py-8 text-slate-500">
+            추천 레시피가 없습니다.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            {aiRecipes.map((recipe, idx) => (
+              <motion.div 
+                key={idx}
+                whileHover={{ scale: 1.01 }}
+                onClick={() => handleRecipeSelect(recipe)}
+                className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:shadow-md hover:border-amber-300 transition-all"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-slate-100 text-slate-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                      {idx + 1}
+                    </span>
+                    <h3 className="text-lg font-bold text-slate-800">{recipe.title}</h3>
+                  </div>
+                  <span className="bg-amber-100 text-amber-800 text-xs px-2 py-1 rounded-full">
+                    {recipe.difficulty} · {recipe.cooking_time}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600 mb-2">{recipe.description}</p>
+                
+                {/* 유튜브 영상 표시 */}
+                {aiYoutubeVideos[recipe.title] && aiYoutubeVideos[recipe.title].length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center gap-1 text-xs text-slate-500 mb-2">
+                      <Play className="w-3 h-3" />
+                      <span>관련 유튜브 영상</span>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {aiYoutubeVideos[recipe.title].slice(0, 2).map((video: any, vIdx: number) => (
+                        <a
+                          key={vIdx}
+                          href={`https://www.youtube.com/watch?v=${video.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-lg px-2 py-1.5 hover:bg-red-100 transition-colors min-w-fit"
+                        >
+                          <Play className="w-3 h-3 text-red-500 fill-current" />
+                          <span className="text-xs text-red-600 font-medium truncate max-w-[120px]">
+                            {video.title}
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100 text-xs">
+                      매칭률 {Math.round((recipe.match_rate || 0) * 100)}%
+                    </span>
+                    {recipe.calories && (
+                      <span className="text-xs text-slate-500">
+                        {recipe.calories}kcal
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-semibold text-amber-600 flex items-center text-sm">
+                    레시피 보기 <ChevronRight className="w-4 h-4" />
+                  </span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+      
+      <div className="mt-4 flex justify-start">
+        <button onClick={() => setStep(3)} className="text-slate-500 px-4 py-2 hover:bg-slate-100 rounded">
+           다른 식단 선택
+        </button>
+      </div>
+    </div>
+  )
+
+  // --- Step 5: Report View (Infographic) ---
   const renderReportStep = () => {
       // Helper to safely parse report content
       let content: any = report
@@ -530,9 +963,9 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
                             <FileText className="w-5 h-5 mr-2 text-violet-600" />
                             {selectedRecipe?.title} 쿠킹 리포트
                          </h2>
-                         <button onClick={() => setStep(3)} className="text-sm text-slate-500 hover:text-slate-800">
-                            다른 레시피 선택
-                         </button>
+                          <button onClick={() => setStep(4)} className="text-sm text-slate-500 hover:text-slate-800">
+                             다른 레시피 선택
+                          </button>
                      </div>
                      <div className="flex-1 overflow-y-auto bg-slate-50 p-6 rounded-lg border prose prose-slate max-w-none">
                         <ReactMarkdown>{report}</ReactMarkdown>
@@ -718,7 +1151,7 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
             {/* Header */}
             <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 relative z-10">
                 <div className="flex space-x-2">
-                    {[1, 2, 3, 4].map((s) => (
+                    {[1, 2, 3, 4, 5].map((s) => (
                         <div 
                             key={s} 
                             className={`w-3 h-3 rounded-full transition-colors ${
@@ -742,10 +1175,11 @@ export default function AnalysisModal({ isOpen, onClose, data, imageData }: Anal
 
             {/* Content */}
             <div className="flex-1 p-6 overflow-hidden relative">
-                 {step === 1 && renderDetectionStep()}
-                 {step === 2 && renderInventoryStep()}
-                 {step === 3 && renderRecipeStep()}
-                 {step === 4 && renderReportStep()}
+                  {step === 1 && renderDetectionStep()}
+                  {step === 2 && renderInventoryStep()}
+                  {step === 3 && renderDietSelectStep()}
+                  {step === 4 && renderAIRecipeStep()}
+                  {step === 5 && renderReportStep()}
 
                  {/* Add Item Form Popover (Global) */}
                  {showAddForm && (

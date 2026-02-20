@@ -1,22 +1,25 @@
 """날짜 계산 유틸리티"""
+
 from datetime import datetime, timedelta
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 
 
-def calculate_days_left(expiry_date: str, current_date: Optional[datetime] = None) -> int:
+def calculate_days_left(
+    expiry_date: str, current_date: Optional[datetime] = None
+) -> int:
     """유통기한까지 남은 일수 계산"""
     if current_date is None:
         current_date = datetime.now()
-    
+
     try:
         if isinstance(expiry_date, str):
             expiry = datetime.strptime(expiry_date, "%Y-%m-%d")
         else:
             expiry = expiry_date
-        
+
         delta = expiry - current_date
         return delta.days
-        
+
     except Exception as e:
         return -1
 

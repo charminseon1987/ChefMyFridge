@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Clock, ChefHat, Flame } from 'lucide-react'
+import { Clock, ChefHat, Flame, Percent } from 'lucide-react'
 import RecipeDetail, { Recipe, Ingredient } from './RecipeDetail'
 
 
@@ -20,6 +20,12 @@ export default function RecipeCard({ recipe, index }: RecipeCardProps) {
     초: 'text-emerald-600 bg-emerald-50 border-emerald-200',
     중: 'text-amber-600 bg-amber-50 border-amber-200',
     고: 'text-rose-600 bg-rose-50 border-rose-200',
+  }
+
+  const matchRateColor = (rate: number) => {
+    if (rate >= 80) return 'bg-emerald-500'
+    if (rate >= 60) return 'bg-amber-500'
+    return 'bg-rose-500'
   }
 
   // 재료 형식 변환 (기존 string[] 또는 Ingredient[])
@@ -78,13 +84,21 @@ export default function RecipeCard({ recipe, index }: RecipeCardProps) {
               ) : (
                 <ChefHat className="w-16 h-16 text-slate-400" />
               )}
-              <div className="absolute top-3 right-3 z-10">
+              <div className="absolute top-3 right-3 z-10 flex gap-2">
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold border backdrop-blur-sm ${difficultyColors[recipe.difficulty]}`}
                 >
                   {recipe.difficulty}
                 </span>
               </div>
+              {recipe.match_rate !== undefined && (
+                <div className="absolute top-3 left-3 z-10">
+                  <div className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg flex items-center gap-1 ${matchRateColor(recipe.match_rate)}`}>
+                    <Percent className="w-3 h-3" />
+                    {recipe.match_rate}% 매칭
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* 레시피 정보 */}

@@ -1,4 +1,5 @@
 """Vision Agent - YOLO v8 + GPT-4o 하이브리드 식재료 인식"""
+
 import os
 import base64
 import json
@@ -22,8 +23,9 @@ def _get_yolo_model():
     if _yolo_model is None:
         try:
             from ultralytics import YOLO
+
             logger.info("YOLO v8 모델 로드 중... (최초 실행 시 자동 다운로드)")
-            _yolo_model = YOLO('yolov8n.pt')
+            _yolo_model = YOLO("yolov8n.pt")
             logger.info("✅ YOLO v8 모델 로드 완료")
         except Exception as e:
             logger.error(f"YOLO 모델 로드 실패: {e}")
@@ -34,7 +36,7 @@ def _get_yolo_model():
 def encode_image(image_path: str) -> str:
     """이미지를 base64로 인코딩"""
     with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+        return base64.b64encode(image_file.read()).decode("utf-8")
 
 
 def calculate_iou(bbox1: List[float], bbox2: List[float]) -> float:
@@ -57,7 +59,9 @@ def calculate_iou(bbox1: List[float], bbox2: List[float]) -> float:
     return intersection / union if union > 0 else 0.0
 
 
-def find_best_yolo_match(gpt_bbox: List[float], yolo_detections: List[Dict], threshold: float = 0.1) -> Optional[int]:
+def find_best_yolo_match(
+    gpt_bbox: List[float], yolo_detections: List[Dict], threshold: float = 0.1
+) -> Optional[int]:
     """GPT bbox와 가장 많이 겹치는 YOLO 탐지 인덱스 반환"""
     if not gpt_bbox or not yolo_detections:
         return None
@@ -66,7 +70,7 @@ def find_best_yolo_match(gpt_bbox: List[float], yolo_detections: List[Dict], thr
     best_idx = None
 
     for idx, detection in enumerate(yolo_detections):
-        iou = calculate_iou(gpt_bbox, detection['bbox_2d'])
+        iou = calculate_iou(gpt_bbox, detection["bbox_2d"])
         if iou > best_iou:
             best_iou = iou
             best_idx = idx
@@ -82,7 +86,7 @@ def detect_with_yolo(image_path: str) -> List[Dict[str, Any]]:
         return []
 
     try:
-        results = model(image_path, conf=0.25, iou=0.45, verbose=False)
+        results = model(image_path, conf=0.1, iou=0.45, verbose=False)
         detections = []
 
         for result in results:
@@ -102,13 +106,17 @@ def detect_with_yolo(image_path: str) -> List[Dict[str, Any]]:
                 class_name = result.names[int(box.cls[0])]
                 confidence = float(box.conf[0])
 
-                detections.append({
-                    'bbox_2d': bbox_2d,
-                    'yolo_class': class_name,
-                    'yolo_conf': confidence
-                })
+                detections.append(
+                    {
+                        "bbox_2d": bbox_2d,
+                        "yolo_class": class_name,
+                        "yolo_conf": confidence,
+                    }
+                )
 
-                logger.info(f"  🎯 YOLO 탐지: {class_name} (conf={confidence:.2f}) → bbox{bbox_2d}")
+                logger.info(
+                    f"  🎯 YOLO 탐지: {class_name} (conf={confidence:.2f}) → bbox{bbox_2d}"
+                )
 
         logger.info(f"✅ YOLO 탐지 완료: {len(detections)}개 객체")
         return detections
@@ -118,16 +126,20 @@ def detect_with_yolo(image_path: str) -> List[Dict[str, Any]]:
         return []
 
 
-def classify_with_gpt(base64_image: str, yolo_detections: List[Dict]) -> List[Dict[str, Any]]:
+def classify_with_gpt(
+    base64_image: str, yolo_detections: List[Dict]
+) -> List[Dict[str, Any]]:
     """GPT-4o로 식재료 상세 분류 - YOLO 결과를 참고하여 정확도 향상"""
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     # YOLO 탐지 결과를 GPT 프롬프트에 포함
     if yolo_detections:
-        yolo_summary = "\n".join([
-            f"  - 위치 {d['bbox_2d']} (0-1000 스케일, [ymin,xmin,ymax,xmax]), 클래스: {d['yolo_class']}, 신뢰도: {d['yolo_conf']:.2f}"
-            for d in yolo_detections
-        ])
+        yolo_summary = "\n".join(
+            [
+                f"  - 위치 {d['bbox_2d']} (0-1000 스케일, [ymin,xmin,ymax,xmax]), 클래스: {d['yolo_class']}, 신뢰도: {d['yolo_conf']:.2f}"
+                for d in yolo_detections
+            ]
+        )
         yolo_context = f"""
 **YOLO v8이 다음 위치에서 객체를 탐지했습니다 (이 좌표는 매우 정확합니다):**
 {yolo_summary}
@@ -163,20 +175,33 @@ YOLO가 탐지하지 못한 추가 식재료도 찾아서 bbox_2d와 함께 포�
 - unit: 개/g/ml/봉지/병/팩 등
 - freshness: 좋음/보통/나쁨
 - packaging: 포장 상태
-- confidence: 0.0~1.0
+- confidence: 0.0~1.0 (확실할수록 1.0에 가깝게, 불확실하면 0.5이상)
 - bbox_2d: [ymin, xmin, ymax, xmax] (해당 식재료 객체를 감싸는 박스, 0-1000 스케일)
 - expiry_date_text: 유통기한 텍스트 (없으면 null)
+
+**중요: confidence는 반드시 0.3 이상으로 설정하세요. 확실하지 않은 항목도 0.3으로 설정하고 포함시키세요.**
+**확실한 식재료는 0.8~1.0, 덜 확실한 것도 0.3~0.7로 설정하여 모두 포함시키세요.**
 
 JSON만 반환하세요: {{"items": [...]}}"""
 
     user_prompt = """이미지의 모든 식재료를 분석하여 JSON으로 반환하세요.
 
-**반드시:**
+**매우 중요 - 모든 식재료를 빠짐없이 감지:**
+- 냉장고/냉동고에 있는 모든 식재료를 하나도 빠뜨리지 마세요
+- 작고 가려진 식재료도 반드시 포함하세요
 - YOLO가 탐지한 모든 위치의 식재료 포함
-- 추가로 보이는 식재료도 포함
-- bbox_2d는 각 식재료 객체를 딱 감싸는 박스 좌표 (이미지를 구역으로 나누는 게 아님)
+- 추가로 보이는 모든 식재료도 포함
+- 과일, 채소, 육류, 유제품, 소스,瓶, 병 등 모든食品을 포함
+
+**감지 규칙:**
+- 보이는 식재료는 반드시 1개 이상 감지 (보이지 않으면 제외)
+- 작은 것, 겹친 것, 일부만 보이는 것도 포함
+- bbox_2d는 각 식재료 객체를 딱 감싸는 박스 좌표
 - 각 식재료마다 bbox가 실제 위치에 따라 모두 달라야 함
-- 최소 10개 이상 찾기"""
+
+**감지 목표:**
+- 반드시 15개 이상 (냉장고에 있는 모든食品)
+- confidence: 확실한 것은 0.8~1.0, 덜 확실해도 0.3~0.7로 설정하고 포함"""
 
     try:
         response = client.chat.completions.create(
@@ -189,20 +214,22 @@ JSON만 반환하세요: {{"items": [...]}}"""
                         {"type": "text", "text": user_prompt},
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
-                        }
-                    ]
-                }
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            },
+                        },
+                    ],
+                },
             ],
             max_tokens=5000,
-            temperature=0.1
+            temperature=0.1,
         )
 
         content = response.choices[0].message.content
         logger.info(f"GPT-4o 응답 (앞 300자): {content[:300]}...")
 
         # JSON 추출
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        json_match = re.search(r"\{.*\}", content, re.DOTALL)
         if json_match:
             result = json.loads(json_match.group())
             items = result.get("items", [])
@@ -217,7 +244,9 @@ JSON만 반환하세요: {{"items": [...]}}"""
         return []
 
 
-def merge_results(yolo_detections: List[Dict], gpt_items: List[Dict]) -> List[Dict[str, Any]]:
+def merge_results(
+    yolo_detections: List[Dict], gpt_items: List[Dict]
+) -> List[Dict[str, Any]]:
     """YOLO의 정확한 bbox와 GPT-4o의 상세 분류를 통합"""
     if not gpt_items:
         return []
@@ -226,7 +255,7 @@ def merge_results(yolo_detections: List[Dict], gpt_items: List[Dict]) -> List[Di
     used_yolo_idxs = set()
 
     for gpt_item in gpt_items:
-        gpt_bbox = gpt_item.get('bbox_2d')
+        gpt_bbox = gpt_item.get("bbox_2d")
 
         # GPT bbox와 가장 많이 겹치는 YOLO 탐지 찾기
         if gpt_bbox and yolo_detections:
@@ -234,42 +263,45 @@ def merge_results(yolo_detections: List[Dict], gpt_items: List[Dict]) -> List[Di
 
             if best_idx is not None and best_idx not in used_yolo_idxs:
                 # YOLO의 정확한 픽셀 기반 bbox로 교체
-                original_bbox = gpt_item.get('bbox_2d')
-                gpt_item['bbox_2d'] = yolo_detections[best_idx]['bbox_2d']
-                gpt_item['yolo_matched'] = True
+                original_bbox = gpt_item.get("bbox_2d")
+                gpt_item["bbox_2d"] = yolo_detections[best_idx]["bbox_2d"]
+                gpt_item["yolo_matched"] = True
                 used_yolo_idxs.add(best_idx)
                 logger.info(
                     f"  🔗 매칭: {gpt_item.get('name')} → "
                     f"GPT bbox {original_bbox} → YOLO bbox {gpt_item['bbox_2d']}"
                 )
             else:
-                gpt_item['yolo_matched'] = False
-                logger.info(f"  📌 GPT 전용: {gpt_item.get('name')} → bbox {gpt_bbox} (YOLO 매칭 없음)")
+                gpt_item["yolo_matched"] = False
+                logger.info(
+                    f"  📌 GPT 전용: {gpt_item.get('name')} → bbox {gpt_bbox} (YOLO 매칭 없음)"
+                )
         else:
-            gpt_item['yolo_matched'] = False
+            gpt_item["yolo_matched"] = False
 
         final_items.append(gpt_item)
 
     # YOLO가 탐지했지만 GPT가 분류하지 못한 항목 (매칭되지 않은 YOLO 탐지)
     unmatched_yolo = [
-        d for idx, d in enumerate(yolo_detections)
-        if idx not in used_yolo_idxs
+        d for idx, d in enumerate(yolo_detections) if idx not in used_yolo_idxs
     ]
     if unmatched_yolo:
         logger.info(f"⚠️ GPT가 누락한 YOLO 탐지 {len(unmatched_yolo)}개 → 기타로 추가")
         for detection in unmatched_yolo:
-            final_items.append({
-                'name': detection['yolo_class'],
-                'category': '기타',
-                'quantity': 1,
-                'unit': '개',
-                'freshness': '보통',
-                'packaging': '없음',
-                'confidence': detection['yolo_conf'],
-                'bbox_2d': detection['bbox_2d'],
-                'expiry_date_text': None,
-                'yolo_matched': True
-            })
+            final_items.append(
+                {
+                    "name": detection["yolo_class"],
+                    "category": "기타",
+                    "quantity": 1,
+                    "unit": "개",
+                    "freshness": "보통",
+                    "packaging": "없음",
+                    "confidence": detection["yolo_conf"],
+                    "bbox_2d": detection["bbox_2d"],
+                    "expiry_date_text": None,
+                    "yolo_matched": True,
+                }
+            )
 
     logger.info(f"✅ 통합 완료: 최종 {len(final_items)}개 항목")
     return final_items
@@ -317,31 +349,58 @@ def vision_agent_node(state: FridgeState) -> FridgeState:
 
         # ── 비식재료 후처리 필터 ───────────────────────────────────────
         NON_FOOD_KEYWORDS = {
-            '냉장고', '냉동고', '냉동실', '냉장실', '선반', '서랍', '트레이', '바구니',
-            '용기', '그릇', '접시', '컵', '박스', '상자', '비닐', '랩', '호일',
-            '가전', '기기', '칸', '공간', '문', '벽', '바닥', '천장'
+            "냉장고",
+            "냉동고",
+            "냉동실",
+            "냉장실",
+            "선반",
+            "서랍",
+            "트레이",
+            "바구니",
+            "용기",
+            "그릇",
+            "접시",
+            "컵",
+            "박스",
+            "상자",
+            "비닐",
+            "랩",
+            "호일",
+            "가전",
+            "기기",
+            "칸",
+            "공간",
+            "문",
+            "벽",
+            "바닥",
+            "천장",
         }
         before_count = len(merged_items)
         merged_items = [
-            item for item in merged_items
-            if not any(kw in item.get('name', '') for kw in NON_FOOD_KEYWORDS)
+            item
+            for item in merged_items
+            if not any(kw in item.get("name", "") for kw in NON_FOOD_KEYWORDS)
         ]
         filtered_count = before_count - len(merged_items)
         if filtered_count > 0:
             logger.info(f"🚫 비식재료 {filtered_count}개 필터링됨")
 
         # bbox 없는 항목은 그리드 배치 없이 그대로 유지 (프론트엔드에서 박스 미표시)
-        items_without_bbox = [item for item in merged_items if not validate_bbox(item.get('bbox_2d'))]
+        items_without_bbox = [
+            item for item in merged_items if not validate_bbox(item.get("bbox_2d"))
+        ]
         if items_without_bbox:
-            logger.warning(f"⚠️ {len(items_without_bbox)}개 항목 bbox 없음 → 박스 미표시")
+            logger.warning(
+                f"⚠️ {len(items_without_bbox)}개 항목 bbox 없음 → 박스 미표시"
+            )
 
         # ── confidence 기준으로 confirmed / unidentified 분리 ──────────
-        CONFIDENCE_THRESHOLD = 0.5
+        CONFIDENCE_THRESHOLD = 0.3
         confirmed_items = []
         unidentified_items = []
 
         for item in merged_items:
-            if item.get('confidence', 0.0) >= CONFIDENCE_THRESHOLD:
+            if item.get("confidence", 0.0) >= CONFIDENCE_THRESHOLD:
                 confirmed_items.append(item)
             else:
                 unidentified_items.append(item)

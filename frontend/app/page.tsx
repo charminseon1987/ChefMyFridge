@@ -483,6 +483,7 @@ const exampleRecipes = [
 
 // 추천 식단 데이터
 const mealPlans = [
+  // 한식
   {
     id: 'korean-1',
     type: 'korean' as const,
@@ -491,7 +492,39 @@ const mealPlans = [
     meals: ['된장찌개 + 밥 + 나물', '불고기 + 밥 + 계란찜', '김치찌개 + 밥 + 두부'],
     calories: 650,
     duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1590301157890-4810ed352733?w=400&h=300&fit=crop&q=80',
   },
+  {
+    id: 'korean-2',
+    type: 'korean' as const,
+    title: '한식 점심 메뉴',
+    description: '바른 식사로 건강한 오후를 보내세요',
+    meals: ['비빔밥 + 계란후라이', '순두부찌개 + 밥', '삼겹살 + 쌈채소'],
+    calories: 700,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1553163147-622ab57be1c7?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'korean-3',
+    type: 'korean' as const,
+    title: '한식 저녁 메뉴',
+    description: '가족과 함께하는 정갈한 한식 저녁',
+    meals: ['갈비탕 + 밥 + 김치', '오징어볶음 + 밥 + 미소국', '제육볶음 + 밥 + 공산'],
+    calories: 800,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'korean-4',
+    type: 'korean' as const,
+    title: '한식 분식 메뉴',
+    description: '감성 만점의 한국 분식',
+    meals: ['라멘 + 김치', '쫄면 + 공기밥', '떡볶이 + 오뎅'],
+    calories: 550,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&h=300&fit=crop&q=80',
+  },
+  // 양식
   {
     id: 'western-1',
     type: 'western' as const,
@@ -500,7 +533,39 @@ const mealPlans = [
     meals: ['파스타 + 샐러드 + 빵', '스테이크 + 감자 + 야채', '피자 + 샐러드'],
     calories: 750,
     duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop&q=80',
   },
+  {
+    id: 'western-2',
+    type: 'western' as const,
+    title: '양식 브런치',
+    description: '풍성한 브런치로 아침을 채우세요',
+    meals: ['에그베네딕트 + 베거블', '와플 + 딸기잼 + 커피', '오믈렛 + 토스트 + 주스'],
+    calories: 600,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'western-3',
+    type: 'western' as const,
+    title: '양식 디너',
+    description: '클래식한 서양 요리의 저녁',
+    meals: ['리조또 + 샐러드', '그라탕 + 빵', '핫도그 + 감자튀김'],
+    calories: 850,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1544148103-0773bf10d330?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'western-4',
+    type: 'western' as const,
+    title: '양식 간단 요리',
+    description: '가볍고 담백한 서양 요리',
+    meals: ['샌드위치 + 수프', '브리토우 + 살사', '카프레제 샐러드 + 빵'],
+    calories: 500,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=400&h=300&fit=crop&q=80',
+  },
+  // 중식
   {
     id: 'chinese-1',
     type: 'chinese' as const,
@@ -509,7 +574,39 @@ const mealPlans = [
     meals: ['짜장면 + 탕수육', '짬뽕 + 볶음밥', '마파두부 + 볶음밥'],
     calories: 800,
     duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=400&h=300&fit=crop&q=80',
   },
+  {
+    id: 'chinese-2',
+    type: 'chinese' as const,
+    title: '중식 점심',
+    description: '빠르고 만족스러운 중식 점심',
+    meals: ['새우볶음밥 + 계란탕', '단무지 + 차이멘', '고기볶음 + 볶음밥'],
+    calories: 700,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1617093727343-374698b1b08d?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'chinese-3',
+    type: 'chinese' as const,
+    title: '중식 저녁',
+    description: '진한 풍미의 중국 저녁 요리',
+    meals: ['깐풍기 + 볶음밥', '양장피 + 탕', '동파육 + 밥'],
+    calories: 900,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'chinese-4',
+    type: 'chinese' as const,
+    title: '중식 디저트',
+    description: '달콤한 중국 디저트',
+    meals: ['찐빵 + 차', '탕수만두', '레몬 차'],
+    calories: 400,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&h=300&fit=crop&q=80',
+  },
+  // 특별한 날
   {
     id: 'special-1',
     type: 'special' as const,
@@ -518,7 +615,29 @@ const mealPlans = [
     meals: ['한우 스테이크 + 와인', '연어 스시 세트', '로브스터 + 샐러드'],
     calories: 900,
     duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&h=300&fit=crop&q=80',
   },
+  {
+    id: 'special-2',
+    type: 'special' as const,
+    title: '프리미엄 디너',
+    description: '특별한 저녁을 위한 고급 요리',
+    meals: ['안창살 + 와인 + 전복', '대구포 + 호박전', '왕새우 + 크림파스타'],
+    calories: 950,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'special-3',
+    type: 'special' as const,
+    title: '가족 모임',
+    description: '가족 모임에 어울리는 메뉴',
+    meals: ['냉무침 + 전복죽', '광동오리 + 채소', '관자 + 미역국'],
+    calories: 850,
+    duration: '2인분',
+    image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=300&fit=crop&q=80',
+  },
+  // 집들이
   {
     id: 'party-1',
     type: 'party' as const,
@@ -527,11 +646,34 @@ const mealPlans = [
     meals: ['치킨 + 감자튀김 + 샐러드', '파스타 + 피자 + 샐러드', '한정식 코스'],
     calories: 1200,
     duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'party-2',
+    type: 'party' as const,
+    title: '파티 요리',
+    description: '분위기 있는 파티를 위한 요리',
+    meals: ['함박스테이크 + 크림스프', '해산물 플래터 + 와인', '바비큐 + 콜슬로'],
+    calories: 1100,
+    duration: '2인분',
+    image: 'https://images.unsplash.com/photo-1555244162-803834f70033?w=400&h=300&fit=crop&q=80',
+  },
+  {
+    id: 'party-3',
+    type: 'party' as const,
+    title: '간단한 모임',
+    description: '가벼운 모임에 맞는 요리',
+    meals: ['피클 + 안주', '과일 플래터 + 와인', '치즈보드 + 크래커'],
+    calories: 600,
+    duration: '1인분',
+    image: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=400&h=300&fit=crop&q=80',
   },
 ]
 
 import AnalysisModal from '@/components/AnalysisModal'
 import AnalysisProgressModal from '@/components/AnalysisProgressModal'
+import axios from 'axios'
+import { Sparkles, Loader2, Play } from 'lucide-react'
 
 // ... (existing imports)
 
@@ -542,6 +684,15 @@ export default function Home() {
   const [progressStage, setProgressStage] = useState('냉장고 스캔 중')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  
+  // AI Recommend States
+  const [userAnswer, setUserAnswer] = useState('')
+  const [aiRecipes, setAiRecipes] = useState<any[]>([])
+  const [aiYoutubeVideos, setAiYoutubeVideos] = useState<Record<string, any[]>>({})
+  const [isLoadingAI, setIsLoadingAI] = useState(false)
+  const [selectedDietType, setSelectedDietType] = useState<string>('')
+  const [showAIRecommend, setShowAIRecommend] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string>('')
   
   // Interval 관리를 위한 Ref 사용
   const progressIntervalRef = useRef<any>(null)
@@ -561,6 +712,58 @@ export default function Home() {
       setIsModalOpen(true) // 모달 열기
     }, 800)
   }
+
+  // AI 추천 요청
+  const handleAIRecommend = async () => {
+    if (!userAnswer.trim()) return
+    
+    setErrorMessage('')
+    setIsLoadingAI(true)
+    try {
+      // 분석 데이터가 있으면 사용, 없으면 기본 재료 사용
+      let detectedItems = analysisData?.detected_items || []
+      
+      // 분석 전이면 기본 재료 사용 (레시피 생성을 위해)
+      if (detectedItems.length === 0) {
+        detectedItems = [
+          { name: '달걀' },
+          { name: '양파' },
+          { name: '마늘' },
+          { name: '대파' },
+          { name: '새우' },
+          { name: '당근' },
+          { name: '감자' },
+          { name: '브로콜리' },
+          { name: '두부' },
+          { name: '닭고기' }
+        ]
+      }
+      
+      const res = await axios.post('http://localhost:8000/api/v1/recipes/ai-recommend', {
+        user_answer: userAnswer,
+        detected_items: detectedItems
+      })
+      
+      setAiRecipes(res.data.recipes || [])
+      setAiYoutubeVideos(res.data.youtube_videos || {})
+      setSelectedDietType(res.data.diet_type || 'general')
+      setShowAIRecommend(true)
+    } catch (e: any) {
+      console.error('AI 추천 오류:', e)
+      const msg = e.response?.data?.detail || '서버 연결에 실패했습니다. 백엔드가 실행 중인지 확인해주세요.'
+      setErrorMessage(msg)
+    } finally {
+      setIsLoadingAI(false)
+    }
+  }
+
+  // 빠른 선택 버튼
+  const quickAnswers = [
+    '다이어트 식단이야',
+    '건강하게 먹고 싶어',
+    '환자식 먹어야 해',
+    '일반식으로 해줘'
+  ]
 
   const handleAnalysisStart = (preview: string) => {
     setIsLoading(true)
@@ -675,7 +878,7 @@ export default function Home() {
                   <h2 className="text-3xl font-bold text-slate-800">
                     추천 식단
                   </h2>
-                  <p className="text-slate-600 text-sm">한식, 양식, 중식, 특별한 날, 집들이 추천 메뉴</p>
+                  <p className="text-slate-600 text-sm">한식, 양식, 중식, 특별한 날, 집들이 추천 메뉴 (총 18가지)</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
@@ -683,6 +886,155 @@ export default function Home() {
                   <MealPlanCard key={plan.id} mealPlan={plan} index={index} />
                 ))}
               </div>
+            </motion.div>
+
+            {/* AI 추천 섹션 */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55, duration: 0.6 }}
+              className="mb-12"
+            >
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="p-2 bg-gradient-to-br from-violet-600 to-purple-600 rounded-lg shadow-3d-emerald">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-800">
+                    AI 맞춤 추천
+                  </h2>
+                  <p className="text-slate-600 text-sm">오늘 뭐 먹을지 고민된다면 AI가 추천해드려요!</p>
+                </div>
+              </div>
+
+              {/* 질문 입력 */}
+              <div className="bg-white rounded-2xl p-6 shadow-lg border border-violet-100 mb-6">
+                <label className="block text-lg font-bold text-slate-700 mb-3">
+                  오늘은 어떤 식사를 하고 싶어요?
+                </label>
+                <div className="flex gap-3 mb-4">
+                  <input
+                    type="text"
+                    value={userAnswer}
+                    onChange={(e) => setUserAnswer(e.target.value)}
+                    placeholder="예: 다이어트 식단, 건강식, 환식..."
+                    className="flex-1 border border-slate-300 rounded-xl px-4 py-3 text-black focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                    onKeyPress={(e) => e.key === 'Enter' && handleAIRecommend()}
+                  />
+                  <button
+                    onClick={handleAIRecommend}
+                    disabled={!userAnswer.trim() || isLoadingAI}
+                    className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white px-6 py-3 rounded-xl font-bold flex items-center disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {isLoadingAI ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        찾는 중...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-5 h-5 mr-2" />
+                        AI 추천
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* 빠른 선택 버튼 */}
+                <div className="flex flex-wrap gap-2">
+                  {quickAnswers.map((answer, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setUserAnswer(answer)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                        userAnswer === answer
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200'
+                      }`}
+                    >
+                      {answer}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 에러 메시지 */}
+                {errorMessage && (
+                  <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="text-red-600 text-sm font-medium">
+                      {errorMessage}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* AI 추천 결과 */}
+              {showAIRecommend && aiRecipes.length > 0 && (
+                <div className="bg-white rounded-2xl p-6 shadow-lg border border-violet-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-slate-800 flex items-center">
+                      <Sparkles className="w-5 h-5 mr-2 text-violet-600" />
+                      AI 추천 레시피 ({aiRecipes.length}가지)
+                    </h3>
+                    <span className="bg-violet-100 text-violet-700 text-sm px-3 py-1 rounded-full font-medium">
+                      {selectedDietType === 'diet' ? '다이어트' : selectedDietType === 'health' ? '건강식' : selectedDietType === 'patient' ? '환자식' : '일반'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {aiRecipes.map((recipe, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-violet-300 transition-all cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="bg-violet-100 text-violet-700 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                              {idx + 1}
+                            </span>
+                            <h4 className="font-bold text-slate-800">{recipe.title}</h4>
+                          </div>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-2 line-clamp-2">{recipe.description}</p>
+                        
+                        {/* 유튜브 영상 */}
+                        {aiYoutubeVideos[recipe.title] && aiYoutubeVideos[recipe.title].length > 0 && (
+                          <div className="flex gap-2 mb-2 overflow-x-auto">
+                            {aiYoutubeVideos[recipe.title].slice(0, 2).map((video: any, vIdx: number) => (
+                              <a
+                                key={vIdx}
+                                href={`https://www.youtube.com/watch?v=${video.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 bg-red-50 border border-red-100 rounded-lg px-2 py-1 hover:bg-red-100 transition-colors min-w-fit"
+                              >
+                                <Play className="w-3 h-3 text-red-500 fill-current" />
+                                <span className="text-xs text-red-600 font-medium truncate max-w-[100px]">
+                                  {video.title}
+                                </span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100">
+                            매칭률 {Math.round((recipe.match_rate || 0) * 100)}%
+                          </span>
+                          <span className="text-slate-500">
+                            {recipe.calories}kcal · {recipe.cooking_time}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {showAIRecommend && aiRecipes.length === 0 && !isLoadingAI && (
+                <div className="text-center py-8 text-slate-500">
+                  추천 레시피가 없습니다.
+                </div>
+              )}
             </motion.div>
 
             {/* 예시 레시피 섹션 */}
